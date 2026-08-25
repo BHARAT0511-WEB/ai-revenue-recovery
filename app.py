@@ -1,10 +1,41 @@
-
 import streamlit as st
-import requests
+import pandas as pd
+import joblib
 
-# -----------------------------
-# Page configuration
-# -----------------------------
+# =========================================================
+# Load ML Model
+# =========================================================
+
+@st.cache_resource
+def load_model():
+    return joblib.load("recovery_model.pkl")
+
+
+pipeline = load_model()
+
+
+# =========================================================
+# Recovery Action Policy
+# =========================================================
+
+def recovery_action(probability, retry_count):
+
+    if retry_count >= 3:
+        return "ESCALATE"
+
+    if probability >= 0.70:
+        return "RETRY"
+
+    elif probability >= 0.40:
+        return "REMINDER"
+
+    else:
+        return "ESCALATE"
+
+
+# =========================================================
+# Page Configuration
+# =========================================================
 
 st.set_page_config(
     page_title="AI Revenue Recovery",
@@ -12,9 +43,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# -----------------------------
-# Custom styling
-# -----------------------------
+
+# =========================================================
+# Custom Styling
+# =========================================================
 
 st.markdown("""
 <style>
@@ -39,9 +71,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------
+
+# =========================================================
 # Header
-# -----------------------------
+# =========================================================
 
 st.markdown(
     '<div class="main-title">💰 AI Revenue Recovery</div>',
@@ -57,45 +90,37 @@ st.markdown(
 
 st.divider()
 
-# -----------------------------
-# Dashboard metrics
-# -----------------------------
+
+# =========================================================
+# Dashboard Metrics
+# =========================================================
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric(
-        "Failed Revenue",
-        "₹5.20 L"
-    )
+    st.metric("Failed Revenue", "₹5.20 L")
 
 with col2:
-    st.metric(
-        "Expected Recovery",
-        "₹2.17 L"
-    )
+    st.metric("Expected Recovery", "₹2.17 L")
 
 with col3:
-    st.metric(
-        "Recovery Rate",
-        "41.74%"
-    )
+    st.metric("Recovery Rate", "41.74%")
 
 with col4:
-    st.metric(
-        "AI Model Accuracy",
-        "91.3%"
-    )
+    st.metric("AI Model Accuracy", "91.3%")
+
 
 st.divider()
 
-# -----------------------------
-# Payment analysis section
-# -----------------------------
+
+# =========================================================
+# Payment Analysis
+# =========================================================
 
 st.subheader("🔍 Analyze Failed Payment")
 
 col1, col2 = st.columns(2)
+
 
 with col1:
 
@@ -127,6 +152,7 @@ with col1:
         ]
     )
 
+
 with col2:
 
     previous_transactions = st.number_input(
@@ -150,96 +176,137 @@ with col2:
         step=1
     )
 
-# -----------------------------
-# Analyze button
-# -----------------------------
+
+# =========================================================
+# Prediction
+# =========================================================
 
 if st.button(
     "🚀 Analyze Payment",
     use_container_width=True
 ):
 
-    payload = {
+    input_data = pd.DataFrame([{
         "amount": amount,
         "payment_method": payment_method,
         "failure_reason": failure_reason,
         "previous_transactions": previous_transactions,
         "previous_successes": previous_successes,
         "retry_count": retry_count
-    }
+    }])
 
     try:
 
-        response = requests.post(
-            "http://127.0.0.1:8001/predict",
-            json=payload,
-            timeout=10
+        # ML prediction
+        probability = pipeline.predict_proba(input_data)[0][1]
+
+        probability = float(probability)
+
+        # Policy decision
+        action = recovery_action(
+            probability,
+            retry_count
         )
 
-        if response.status_code == 200:
+        # Expected recovery
+        expected_recovery = amount * probability
 
-            result = response.json()
 
-            probability = result["recovery_probability"]
-            action = result["recommended_action"]
-            expected_recovery = result["expected_recovery"]
-            reason = result["reason"]
+        # Reason
+        if action == "RETRY":
 
-            st.divider()
+            reason = (
+                "High probability of payment recovery. "
+                "Retrying the payment is recommended."
+            )
 
-            st.subheader("🤖 AI Decision")
+        elif action == "REMINDER":
 
-            r1, r2, r3 = st.columns(3)
-
-            with r1:
-                st.metric(
-                    "Recovery Probability",
-                    f"{probability * 100:.1f}%"
-                )
-
-            with r2:
-                st.metric(
-                    "Recommended Action",
-                    action
-                )
-
-            with r3:
-                st.metric(
-                    "Expected Recovery",
-                    f"₹{expected_recovery:,.2f}"
-                )
-
-            st.markdown(
-                f"""
-                <div class="result-box">
-
-                <h3>AI Recommendation</h3>
-
-                <p><b>Action:</b> {action}</p>
-
-                <p><b>Reason:</b> {reason}</p>
-
-                <p>
-                <b>Expected Revenue Recovery:</b>
-                ₹{expected_recovery:,.2f}
-                </p>
-
-                </div>
-                """,
-                unsafe_allow_html=True
+            reason = (
+                "Medium probability of recovery. "
+                "Customer reminder is recommended."
             )
 
         else:
 
-            st.error(
-                f"API Error: {response.status_code}"
+            reason = (
+                "Low recovery probability or retry limit reached. "
+                "Escalation is recommended."
             )
+
+
+        # =================================================
+        # Display Results
+        # =================================================
+
+        st.divider()
+
+        st.subheader("🤖 AI Decision")
+
+        r1, r2, r3 = st.columns(3)
+
+
+        with r1:
+
+            st.metric(
+                "Recovery Probability",
+                f"{probability * 100:.1f}%"
+            )
+
+
+        with r2:
+
+            st.metric(
+                "Recommended Action",
+                action
+            )
+
+
+        with r3:
+
+            st.metric(
+                "Expected Recovery",
+                f"₹{expected_recovery:,.2f}"
+            )
+
+
+        # =================================================
+        # Recommendation Box
+        # =================================================
+
+        st.markdown(
+            f"""
+            <div class="result-box">
+
+            <h3>🤖 AI Recommendation</h3>
+
+            <p>
+            <b>Action:</b> {action}
+            </p>
+
+            <p>
+            <b>Recovery Probability:</b>
+            {probability * 100:.1f}%
+            </p>
+
+            <p>
+            <b>Reason:</b>
+            {reason}
+            </p>
+
+            <p>
+            <b>Expected Revenue Recovery:</b>
+            ₹{expected_recovery:,.2f}
+            </p>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
 
     except Exception as e:
 
-        st.error(
-            "Could not connect to FastAPI. "
-            "Make sure the API server is running on port 8001."
-        )
+        st.error("Prediction failed.")
 
         st.code(str(e))
