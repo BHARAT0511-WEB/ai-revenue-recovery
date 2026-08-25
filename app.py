@@ -1,41 +1,17 @@
 import streamlit as st
 import pandas as pd
-import joblib
+import numpy as np
+
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 
 # =========================================================
-# LOAD MODEL
-# =========================================================
-
-@st.cache_resource
-def load_model():
-    return joblib.load("recovery_model.pkl")
-
-
-pipeline = load_model()
-
-
-# =========================================================
-# RECOVERY POLICY
-# =========================================================
-
-def recovery_action(probability, retry_count):
-
-    if retry_count >= 3:
-        return "ESCALATE"
-
-    if probability >= 0.70:
-        return "RETRY"
-
-    elif probability >= 0.40:
-        return "REMINDER"
-
-    else:
-        return "ESCALATE"
-
-
-# =========================================================
-# PAGE CONFIGURATION
+# PAGE CONFIG
 # =========================================================
 
 st.set_page_config(
@@ -74,6 +50,200 @@ st.markdown("""
 
 
 # =========================================================
+# LOAD DATA
+# =========================================================
+
+@st.cache_data
+def load_data():
+
+    df = pd.read_csv("transactions.csv")
+
+    return df
+
+
+# =========================================================
+# TRAIN MODEL
+# =========================================================
+
+@st.cache_resource
+def train_model(df):
+
+    # Expected feature columns
+    feature_columns = [
+        "amount",
+        "payment_method",
+        "failure_reason",
+        "previous_transactions",
+        "previous_successes",
+        "retry_count"
+    ]
+
+    # Check columns
+    missing = [
+        col for col in feature_columns
+        if col not in df.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            f"Missing columns in transactions.csv: {missing}"
+        )
+
+    # Find target column
+    possible_targets = [
+        "recovered",
+        "recovery",
+        "is_recovered",
+        "success"
+    ]
+
+    target_column = None
+
+    for col in possible_targets:
+        if col in df.columns:
+            target_column = col
+            break
+
+    if target_column is None:
+
+        # Try to find a binary column
+        for col in df.columns:
+
+            unique_values = df[col].dropna().unique()
+
+            if len(unique_values) == 2:
+
+                if col not in feature_columns:
+                    target_column = col
+                    break
+
+    if target_column is None:
+        raise ValueError(
+            "Could not find recovery target column in transactions.csv."
+        )
+
+    X = df[feature_columns].copy()
+    y = df[target_column].copy()
+
+    # Convert target to 0/1 if necessary
+    if y.dtype == "object":
+
+        mapping = {
+            "yes": 1,
+            "no": 0,
+            "true": 1,
+            "false": 0,
+            "recovered": 1,
+            "failed": 0,
+            "success": 1,
+            "failure": 0
+        }
+
+        y = (
+            y.astype(str)
+            .str.lower()
+            .map(mapping)
+        )
+
+    y = pd.to_numeric(y, errors="coerce")
+
+    valid_rows = y.notna()
+
+    X = X.loc[valid_rows].copy()
+    y = y.loc[valid_rows].astype(int)
+
+    numerical_features = [
+        "amount",
+        "previous_transactions",
+        "previous_successes",
+        "retry_count"
+    ]
+
+    categorical_features = [
+        "payment_method",
+        "failure_reason"
+    ]
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "num",
+                "passthrough",
+                numerical_features
+            ),
+            (
+                "cat",
+                OneHotEncoder(
+                    handle_unknown="ignore"
+                ),
+                categorical_features
+            )
+        ]
+    )
+
+    model = RandomForestClassifier(
+        n_estimators=200,
+        class_weight="balanced",
+        random_state=42,
+        n_jobs=-1
+    )
+
+    pipeline = Pipeline(
+        steps=[
+            (
+                "preprocessor",
+                preprocessor
+            ),
+            (
+                "model",
+                model
+            )
+        ]
+    )
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.20,
+        random_state=42,
+        stratify=y
+    )
+
+    pipeline.fit(
+        X_train,
+        y_train
+    )
+
+    predictions = pipeline.predict(X_test)
+
+    accuracy = accuracy_score(
+        y_test,
+        predictions
+    )
+
+    return pipeline, accuracy, target_column
+
+
+# =========================================================
+# LOAD + TRAIN
+# =========================================================
+
+try:
+
+    df = load_data()
+
+    pipeline, accuracy, target_column = train_model(df)
+
+except Exception as e:
+
+    st.error("Model setup failed.")
+
+    st.exception(e)
+
+    st.stop()
+
+
+# =========================================================
 # HEADER
 # =========================================================
 
@@ -93,40 +263,113 @@ st.divider()
 
 
 # =========================================================
-# BUSINESS METRICS
+# DASHBOARD METRICS
 # =========================================================
+
+# Failed transactions
+failed_df = df.copy()
+
+# Identify failed/recovery rows
+if target_column in failed_df.columns:
+
+    target_numeric = pd.to_numeric(
+        failed_df[target_column],
+        errors="coerce"
+    )
+
+    failed_df = failed_df[target_numeric == 0]
+
+
+# Total failed revenue
+if "amount" in failed_df.columns:
+
+    failed_revenue = float(
+        failed_df["amount"].sum()
+    )
+
+else:
+
+    failed_revenue = 0.0
+
+
+# Predict recovery probability for failed transactions
+if len(failed_df) > 0:
+
+    prediction_features = failed_df[
+        [
+            "amount",
+            "payment_method",
+            "failure_reason",
+            "previous_transactions",
+            "previous_successes",
+            "retry_count"
+        ]
+    ].copy()
+
+    probabilities = pipeline.predict_proba(
+        prediction_features
+    )[:, 1]
+
+    expected_recovery = float(
+        (
+            failed_df["amount"].values
+            * probabilities
+        ).sum()
+    )
+
+else:
+
+    expected_recovery = 0.0
+
+
+if failed_revenue > 0:
+
+    recovery_rate = (
+        expected_recovery
+        / failed_revenue
+    ) * 100
+
+else:
+
+    recovery_rate = 0.0
+
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
+
     st.metric(
         "Failed Revenue",
-        "₹5.20 L"
+        f"₹{failed_revenue:,.0f}"
     )
 
 with col2:
+
     st.metric(
         "Expected Recovery",
-        "₹2.17 L"
+        f"₹{expected_recovery:,.0f}"
     )
 
 with col3:
+
     st.metric(
         "Recovery Rate",
-        "41.74%"
+        f"{recovery_rate:.2f}%"
     )
 
 with col4:
+
     st.metric(
         "AI Model Accuracy",
-        "91.3%"
+        f"{accuracy * 100:.1f}%"
     )
+
 
 st.divider()
 
 
 # =========================================================
-# PAYMENT INPUT
+# PAYMENT ANALYSIS
 # =========================================================
 
 st.subheader("🔍 Analyze Failed Payment")
@@ -145,23 +388,24 @@ with col1:
 
     payment_method = st.selectbox(
         "Payment Method",
-        [
-            "UPI",
-            "Card",
-            "Net Banking",
-            "Wallet"
-        ]
+        sorted(
+            df["payment_method"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
     )
 
     failure_reason = st.selectbox(
         "Failure Reason",
-        [
-            "Network Error",
-            "Insufficient Funds",
-            "Bank Timeout",
-            "Authentication Failure",
-            "Expired Card"
-        ]
+        sorted(
+            df["failure_reason"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
     )
 
 
@@ -190,7 +434,7 @@ with col2:
 
 
 # =========================================================
-# ANALYZE PAYMENT
+# PREDICTION
 # =========================================================
 
 if st.button(
@@ -198,85 +442,77 @@ if st.button(
     use_container_width=True
 ):
 
-    # Create model input
-    input_data = pd.DataFrame([{
-        "amount": amount,
-        "payment_method": payment_method,
-        "failure_reason": failure_reason,
-        "previous_transactions": previous_transactions,
-        "previous_successes": previous_successes,
-        "retry_count": retry_count
-    }])
+    input_data = pd.DataFrame(
+        [{
+            "amount": amount,
+            "payment_method": payment_method,
+            "failure_reason": failure_reason,
+            "previous_transactions": previous_transactions,
+            "previous_successes": previous_successes,
+            "retry_count": retry_count
+        }]
+    )
 
     try:
 
-        # -------------------------------------------------
-        # ML PREDICTION
-        # -------------------------------------------------
-
-        probability = pipeline.predict_proba(
-            input_data
-        )[0][1]
-
-        probability = float(probability)
-
-
-        # -------------------------------------------------
-        # RECOVERY ACTION
-        # -------------------------------------------------
-
-        action = recovery_action(
-            probability,
-            retry_count
+        probability = float(
+            pipeline.predict_proba(
+                input_data
+            )[0][1]
         )
-
-
-        # -------------------------------------------------
-        # EXPECTED RECOVERY
-        # -------------------------------------------------
 
         expected_recovery = (
-            float(amount) * probability
+            amount * probability
         )
 
+        # AI action
+        if probability >= 0.75:
 
-        # -------------------------------------------------
-        # EXPLANATION
-        # -------------------------------------------------
-
-        if action == "RETRY":
+            action = "Retry Payment"
 
             reason = (
-                "High probability of payment recovery. "
-                "Retrying the payment is recommended."
+                "High recovery probability. "
+                "A payment retry is recommended."
             )
 
-        elif action == "REMINDER":
+        elif probability >= 0.50:
+
+            action = "Smart Retry"
 
             reason = (
-                "Medium probability of recovery. "
-                "A customer reminder is recommended."
+                "Moderate recovery probability. "
+                "Retry with optimized timing."
+            )
+
+        elif probability >= 0.30:
+
+            action = "Customer Reminder"
+
+            reason = (
+                "Recovery probability is moderate-low. "
+                "Send a payment reminder before retrying."
             )
 
         else:
 
+            action = "Manual Review"
+
             reason = (
-                "Low recovery probability or retry limit "
-                "reached. Escalation is recommended."
+                "Low recovery probability. "
+                "Manual review or alternative payment method "
+                "is recommended."
             )
 
 
-        # -------------------------------------------------
-        # DISPLAY RESULTS
-        # -------------------------------------------------
+        # =================================================
+        # RESULT
+        # =================================================
 
         st.divider()
 
         st.subheader("🤖 AI Decision")
 
-
         r1, r2, r3 = st.columns(3)
-
 
         with r1:
 
@@ -285,14 +521,12 @@ if st.button(
                 f"{probability * 100:.1f}%"
             )
 
-
         with r2:
 
             st.metric(
                 "Recommended Action",
                 action
             )
-
 
         with r3:
 
@@ -302,28 +536,23 @@ if st.button(
             )
 
 
-        # -------------------------------------------------
-        # RECOMMENDATION BOX
-        # -------------------------------------------------
-
         st.markdown(
             f"""
             <div class="result-box">
 
-            <h3>🤖 AI Recommendation</h3>
+            <h3>AI Recommendation</h3>
 
             <p>
             <b>Action:</b> {action}
             </p>
 
             <p>
-            <b>Recovery Probability:</b>
-            {probability * 100:.1f}%
+            <b>Reason:</b> {reason}
             </p>
 
             <p>
-            <b>Reason:</b>
-            {reason}
+            <b>Recovery Probability:</b>
+            {probability * 100:.1f}%
             </p>
 
             <p>
@@ -336,11 +565,37 @@ if st.button(
             unsafe_allow_html=True
         )
 
-
     except Exception as e:
 
         st.error(
             "Prediction failed."
         )
 
-        st.code(str(e))
+        st.exception(e)
+
+
+# =========================================================
+# DATASET INFORMATION
+# =========================================================
+
+with st.expander("📊 Dataset & Model Information"):
+
+    st.write(
+        f"**Dataset rows:** {len(df):,}"
+    )
+
+    st.write(
+        f"**Dataset columns:** {len(df.columns)}"
+    )
+
+    st.write(
+        f"**Target column:** `{target_column}`"
+    )
+
+    st.write(
+        f"**Model:** Random Forest Classifier"
+    )
+
+    st.write(
+        f"**Test Accuracy:** {accuracy * 100:.2f}%"
+    )
