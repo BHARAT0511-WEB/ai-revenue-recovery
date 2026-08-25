@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import joblib
 
+
 # =========================================================
-# Load ML Model
+# LOAD MODEL
 # =========================================================
 
 @st.cache_resource
@@ -15,7 +16,7 @@ pipeline = load_model()
 
 
 # =========================================================
-# Recovery Action Policy
+# RECOVERY POLICY
 # =========================================================
 
 def recovery_action(probability, retry_count):
@@ -34,7 +35,7 @@ def recovery_action(probability, retry_count):
 
 
 # =========================================================
-# Page Configuration
+# PAGE CONFIGURATION
 # =========================================================
 
 st.set_page_config(
@@ -45,7 +46,7 @@ st.set_page_config(
 
 
 # =========================================================
-# Custom Styling
+# CUSTOM CSS
 # =========================================================
 
 st.markdown("""
@@ -73,7 +74,7 @@ st.markdown("""
 
 
 # =========================================================
-# Header
+# HEADER
 # =========================================================
 
 st.markdown(
@@ -92,29 +93,40 @@ st.divider()
 
 
 # =========================================================
-# Dashboard Metrics
+# BUSINESS METRICS
 # =========================================================
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("Failed Revenue", "₹5.20 L")
+    st.metric(
+        "Failed Revenue",
+        "₹5.20 L"
+    )
 
 with col2:
-    st.metric("Expected Recovery", "₹2.17 L")
+    st.metric(
+        "Expected Recovery",
+        "₹2.17 L"
+    )
 
 with col3:
-    st.metric("Recovery Rate", "41.74%")
+    st.metric(
+        "Recovery Rate",
+        "41.74%"
+    )
 
 with col4:
-    st.metric("AI Model Accuracy", "91.3%")
-
+    st.metric(
+        "AI Model Accuracy",
+        "91.3%"
+    )
 
 st.divider()
 
 
 # =========================================================
-# Payment Analysis
+# PAYMENT INPUT
 # =========================================================
 
 st.subheader("🔍 Analyze Failed Payment")
@@ -178,7 +190,7 @@ with col2:
 
 
 # =========================================================
-# Prediction
+# ANALYZE PAYMENT
 # =========================================================
 
 if st.button(
@@ -186,6 +198,7 @@ if st.button(
     use_container_width=True
 ):
 
+    # Create model input
     input_data = pd.DataFrame([{
         "amount": amount,
         "payment_method": payment_method,
@@ -197,22 +210,40 @@ if st.button(
 
     try:
 
-        # ML prediction
-        probability = pipeline.predict_proba(input_data)[0][1]
+        # -------------------------------------------------
+        # ML PREDICTION
+        # -------------------------------------------------
+
+        probability = pipeline.predict_proba(
+            input_data
+        )[0][1]
 
         probability = float(probability)
 
-        # Policy decision
+
+        # -------------------------------------------------
+        # RECOVERY ACTION
+        # -------------------------------------------------
+
         action = recovery_action(
             probability,
             retry_count
         )
 
-        # Expected recovery
-        expected_recovery = amount * probability
+
+        # -------------------------------------------------
+        # EXPECTED RECOVERY
+        # -------------------------------------------------
+
+        expected_recovery = (
+            float(amount) * probability
+        )
 
 
-        # Reason
+        # -------------------------------------------------
+        # EXPLANATION
+        # -------------------------------------------------
+
         if action == "RETRY":
 
             reason = (
@@ -224,24 +255,25 @@ if st.button(
 
             reason = (
                 "Medium probability of recovery. "
-                "Customer reminder is recommended."
+                "A customer reminder is recommended."
             )
 
         else:
 
             reason = (
-                "Low recovery probability or retry limit reached. "
-                "Escalation is recommended."
+                "Low recovery probability or retry limit "
+                "reached. Escalation is recommended."
             )
 
 
-        # =================================================
-        # Display Results
-        # =================================================
+        # -------------------------------------------------
+        # DISPLAY RESULTS
+        # -------------------------------------------------
 
         st.divider()
 
         st.subheader("🤖 AI Decision")
+
 
         r1, r2, r3 = st.columns(3)
 
@@ -270,9 +302,9 @@ if st.button(
             )
 
 
-        # =================================================
-        # Recommendation Box
-        # =================================================
+        # -------------------------------------------------
+        # RECOMMENDATION BOX
+        # -------------------------------------------------
 
         st.markdown(
             f"""
@@ -307,6 +339,8 @@ if st.button(
 
     except Exception as e:
 
-        st.error("Prediction failed.")
+        st.error(
+            "Prediction failed."
+        )
 
         st.code(str(e))
