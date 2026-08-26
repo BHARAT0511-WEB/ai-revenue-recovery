@@ -779,17 +779,6 @@ elif page == "AI Insights":
 
     st.subheader("🤖 AI Revenue Insights")
 
-    # Payment method analysis
-    method_analysis = (
-        failed_df.groupby("payment_method")
-        .agg(
-            failed_transactions=("payment_method", "count"),
-            failed_revenue=("amount", "sum")
-        )
-        .reset_index()
-    )
-
-    # Generate actual recovery probabilities from the trained model
     prediction_features = [
         "amount",
         "payment_method",
@@ -799,13 +788,19 @@ elif page == "AI Insights":
         "retry_count"
     ]
 
+    # Empty failed-data safeguard
+    if failed_df.empty:
+        st.info("No failed transactions are available for AI insights.")
+        st.stop()
+
     failed_input = failed_df[prediction_features].copy()
 
+    # Model predictions for failed transactions
     recovery_probability = pipeline.predict_proba(
         failed_input
     )[:, 1]
 
-    # Actual failed transaction data by payment method
+    # Payment-method analysis
     method_analysis = (
         failed_df
         .groupby("payment_method")
@@ -816,10 +811,9 @@ elif page == "AI Insights":
         .reset_index()
     )
 
-    # Calculate recovery probability by payment method
     failed_method_probability = pd.DataFrame({
         "payment_method": failed_df["payment_method"].values,
-        "recovery_probability":  recovery_probability
+        "recovery_probability": recovery_probability
     })
 
     method_probability = (
@@ -828,36 +822,28 @@ elif page == "AI Insights":
         .mean()
     )
 
-    # Combine actual transaction data with model predictions
     method_analysis = method_analysis.merge(
         method_probability,
         on="payment_method",
         how="left"
     )
 
-    # Convert probability to percentage
     method_analysis["recovery_rate"] = (
-        method_analysis["recovery_probability"].fillna(0) * 100
-    ).round(2) 
-
-    method_analysis["failed_revenue"] = (
-        method_analysis["failed_revenue"].round(2)
+        method_analysis["recovery_probability"]
+        .fillna(0)
+        .mul(100)
+        .round(2)
     )
 
-# Best and worst payment method
-if len(method_analysis) > 0:
+    method_analysis["failed_revenue"] = (
+        method_analysis["failed_revenue"]
+        .round(2)
+    )
 
-    best_method = method_analysis.loc[
-        method_analysis["recovery_rate"].idxmax()
-    ]
-
-    worst_method = method_analysis.loc[
-        method_analysis["recovery_rate"].idxmin()
-    ]
-
-    # Failure Reason Analysis
+    # Failure-reason analysis
     reason_analysis = (
-        failed_df.groupby("failure_reason")
+        failed_df
+        .groupby("failure_reason")
         .agg(
             failed_transactions=("failure_reason", "count"),
             failed_revenue=("amount", "sum")
@@ -865,19 +851,15 @@ if len(method_analysis) > 0:
         .reset_index()
     )
 
-    # Use actual model predictions
     reason_probability = pd.DataFrame({
         "failure_reason": failed_df["failure_reason"].values,
-        "recovery_probability": pipeline.predict_proba(
-             failed_input
-        )[:, 1]
-})
+        "recovery_probability": recovery_probability
+    })
 
     reason_probability = (
         reason_probability
-        .groupby("failure_reason")["recovery_probability"]
+        .groupby("failure_reason", as_index=False)["recovery_probability"]
         .mean()
-        .reset_index()
     )
 
     reason_analysis = reason_analysis.merge(
@@ -887,58 +869,61 @@ if len(method_analysis) > 0:
     )
 
     reason_analysis["recovery_rate"] = (
-        reason_analysis["recovery_probability"] * 100
-    ).round(2)
+        reason_analysis["recovery_probability"]
+        .fillna(0)
+        .mul(100)
+        .round(2)
+    )
 
     reason_analysis["failed_revenue"] = (
-        reason_analysis["failed_revenue"].round(2)
+        reason_analysis["failed_revenue"]
+        .round(2)
     )
-    # Best failure reason
-    if len(reason_analysis) > 0:
 
-        best_reason = reason_analysis.loc[
-            reason_analysis["recovery_rate"].idxmax()
-        ]
+    # Find best/worst groups
+    best_method = method_analysis.loc[
+        method_analysis["recovery_rate"].idxmax()
+    ]
 
-        worst_reason = reason_analysis.loc[
-            reason_analysis["recovery_rate"].idxmin()
-        ]
+    worst_method = method_analysis.loc[
+        method_analysis["recovery_rate"].idxmin()
+    ]
+
+    best_reason = reason_analysis.loc[
+        reason_analysis["recovery_rate"].idxmax()
+    ]
+
+    worst_reason = reason_analysis.loc[
+        reason_analysis["recovery_rate"].idxmin()
+    ]
 
     i1, i2 = st.columns(2)
 
     with i1:
-
         st.markdown(
             f"""
             <div class="insight-box">
-
-            <h3>🏆 Best Recovery Channel</h3>
-
-            <p>
-            <b>{best_method["payment_method"]}</b>
-            has the highest expected recovery rate of
-            <b>{best_method["recovery_rate"]:.1f}%</b>.
-            </p>
-
+                <h3>🏆 Best Recovery Channel</h3>
+                <p>
+                    <b>{best_method["payment_method"]}</b>
+                    has the highest expected recovery rate of
+                    <b>{best_method["recovery_rate"]:.1f}%</b>.
+                </p>
             </div>
             """,
             unsafe_allow_html=True
         )
 
     with i2:
-
         st.markdown(
             f"""
             <div class="insight-box">
-
-            <h3>⚠️ Highest Risk Channel</h3>
-
-            <p>
-            <b>{worst_method["payment_method"]}</b>
-            has the lowest expected recovery rate of
-            <b>{worst_method["recovery_rate"]:.1f}%</b>.
-            </p>
-
+                <h3>⚠️ Highest Risk Channel</h3>
+                <p>
+                    <b>{worst_method["payment_method"]}</b>
+                    has the lowest expected recovery rate of
+                    <b>{worst_method["recovery_rate"]:.1f}%</b>.
+                </p>
             </div>
             """,
             unsafe_allow_html=True
@@ -947,38 +932,30 @@ if len(method_analysis) > 0:
     i3, i4 = st.columns(2)
 
     with i3:
-
         st.markdown(
             f"""
             <div class="insight-box">
-
-            <h3>💡 Most Recoverable Failure</h3>
-
-            <p>
-            <b>{best_reason["failure_reason"]}</b>
-            shows the strongest expected recovery rate:
-            <b>{best_reason["recovery_rate"]:.1f}%</b>.
-            </p>
-
+                <h3>💡 Most Recoverable Failure</h3>
+                <p>
+                    <b>{best_reason["failure_reason"]}</b>
+                    shows the strongest expected recovery rate:
+                    <b>{best_reason["recovery_rate"]:.1f}%</b>.
+                </p>
             </div>
             """,
             unsafe_allow_html=True
         )
 
     with i4:
-
         st.markdown(
             f"""
             <div class="insight-box">
-
-            <h3>🚨 Priority Failure Type</h3>
-
-            <p>
-            <b>{worst_reason["failure_reason"]}</b>
-            has the lowest expected recovery rate:
-            <b>{worst_reason["recovery_rate"]:.1f}%</b>.
-            </p>
-
+                <h3>🚨 Priority Failure Type</h3>
+                <p>
+                    <b>{worst_reason["failure_reason"]}</b>
+                    has the lowest expected recovery rate:
+                    <b>{worst_reason["recovery_rate"]:.1f}%</b>.
+                </p>
             </div>
             """,
             unsafe_allow_html=True
@@ -989,25 +966,19 @@ if len(method_analysis) > 0:
     st.subheader("🎯 Recommended Business Strategy")
 
     if recovery_rate >= 40:
-
         st.success(
             "The AI model indicates strong recovery potential. "
-            "Prioritize high-probability failed payments for "
-            "automated retries."
+            "Prioritize high-probability failed payments for automated retries."
         )
-
     elif recovery_rate >= 25:
-
         st.warning(
-            "Recovery potential is moderate. Combine automated "
-            "retries with customer reminders."
+            "Recovery potential is moderate. Combine automated retries "
+            "with customer reminders."
         )
-
     else:
-
         st.error(
-            "Recovery potential is relatively low. "
-            "Prioritize escalation and alternate payment methods."
+            "Recovery potential is relatively low. Prioritize escalation "
+            "and alternate payment methods."
         )
 
     st.write(
@@ -1015,11 +986,8 @@ if len(method_analysis) > 0:
         Based on the current dataset:
 
         - **{failed_transactions:,}** failed transactions require attention.
-        - Expected recoverable revenue is approximately
-          **₹{expected_recovery:,.2f}**.
-        - The model's test accuracy is
-          **{accuracy * 100:.1f}%**.
-        - Estimated recovery rate is
-          **{recovery_rate:.2f}%**.
+        - Expected recoverable revenue is approximately **₹{expected_recovery:,.2f}**.
+        - The model's test accuracy is **{accuracy * 100:.1f}%**.
+        - Estimated recovery rate is **{recovery_rate:.2f}%**.
         """
     )
