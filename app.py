@@ -805,44 +805,44 @@ elif page == "AI Insights":
         failed_input
     )[:, 1]
 
-# Actual failed transaction data by payment method
-method_analysis = (
-    failed_df
-    .groupby("payment_method")
-    .agg(
-        failed_transactions=("payment_method", "count"),
-        failed_revenue=("amount", "sum")
+    # Actual failed transaction data by payment method
+    method_analysis = (
+        failed_df
+        .groupby("payment_method")
+        .agg(
+            failed_transactions=("payment_method", "count"),
+            failed_revenue=("amount", "sum")
+        )
+        .reset_index()
     )
-    .reset_index()
-)
 
-# Calculate recovery probability by payment method
-failed_method_probability = pd.DataFrame({
-    "payment_method": failed_df["payment_method"].values,
-    "recovery_probability":  recovery_probability
-})
+    # Calculate recovery probability by payment method
+    failed_method_probability = pd.DataFrame({
+        "payment_method": failed_df["payment_method"].values,
+        "recovery_probability":  recovery_probability
+    })
 
-method_probability = (
-    failed_method_probability
-    .groupby("payment_method", as_index=False)["recovery_probability"]
-    .mean()
-)
+    method_probability = (
+        failed_method_probability
+        .groupby("payment_method", as_index=False)["recovery_probability"]
+        .mean()
+    )
 
-# Combine actual transaction data with model predictions
-method_analysis = method_analysis.merge(
-    method_probability,
-    on="payment_method",
-    how="left"
-)
+    # Combine actual transaction data with model predictions
+    method_analysis = method_analysis.merge(
+        method_probability,
+        on="payment_method",
+        how="left"
+    )
 
-# Convert probability to percentage
-method_analysis["recovery_rate"] = (
-    method_analysis["recovery_probability"].fillna(0) * 100
-).round(2) 
+    # Convert probability to percentage
+    method_analysis["recovery_rate"] = (
+        method_analysis["recovery_probability"].fillna(0) * 100
+    ).round(2) 
 
-method_analysis["failed_revenue"] = (
-    method_analysis["failed_revenue"].round(2)
-)
+    method_analysis["failed_revenue"] = (
+        method_analysis["failed_revenue"].round(2)
+    )
 
 # Best and worst payment method
 if len(method_analysis) > 0:
