@@ -815,12 +815,18 @@ method_analysis = (
     )
     .reset_index()
 )
- # Calculate model-based recovery probability by payment method
+
+# Calculate recovery probability by payment method
+failed_method_probability = pd.DataFrame({
+    "payment_method": failed_df["payment_method"].values,
+    "recovery_probability": recovery_probability
+})
+
 method_probability = (
     failed_method_probability
     .groupby("payment_method", as_index=False)["recovery_probability"]
     .mean()
-) 
+)
 
 # Combine actual transaction data with model predictions
 method_analysis = method_analysis.merge(
