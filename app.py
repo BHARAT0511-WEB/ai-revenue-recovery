@@ -834,11 +834,11 @@ method_analysis["failed_revenue"] = (
 if len(method_analysis) > 0:
 
     best_method = method_analysis.loc[
-        method_analysis["recovery_rate"].idxmax(),
+        method_analysis["recovery_rate"].idxmax()
     ]
 
     worst_method = method_analysis.loc[
-        method_analysis["recovery_rate"].idxmin(),
+        method_analysis["recovery_rate"].idxmin()
     ]
 
     # Failure Reason Analysis
