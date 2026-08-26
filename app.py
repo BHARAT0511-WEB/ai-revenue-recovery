@@ -561,7 +561,6 @@ st.markdown(
 
 st.divider()
 
-
 # DASHBOARD SIDEBAR
 st.sidebar.markdown("## 💰 RecoverAI")
 st.sidebar.caption("AI Revenue Recovery Platform")
@@ -575,26 +574,6 @@ if st.sidebar.button(
 
 st.sidebar.divider()
 
-page = st.sidebar.radio(
-    "Navigate",
-    [
-        "Overview",
-        "Payment Analyzer",
-        "Transaction History",
-        "AI Insights"
-    ],
-    index=[
-        "Overview",
-        "Payment Analyzer",
-        "Transaction History",
-        "AI Insights"
-    ].index(st.session_state.selected_page)
-)
-
-st.session_state.selected_page = page
-
-st.sidebar.divider()
-
 st.sidebar.metric(
     "Transactions",
     f"{transaction_count:,}"
@@ -604,6 +583,8 @@ st.sidebar.metric(
     "Model Accuracy",
     f"{accuracy * 100:.1f}%"
 )
+
+page = st.session_state.selected_page
 
 # OVERVIEW
 if page == "Overview":
@@ -674,126 +655,174 @@ if page == "Overview":
 
     st.divider()
 
-    # ACTION SECTION
-    st.subheader("🎯 Priority Recovery Actions")
+    # PRIORITY RECOVERY PAYMENTS
+st.subheader("🎯 Priority Recovery Actions")
 
-    if failed_df.empty:
-        st.success(
-            "Great news! No failed transactions are currently "
-            "available in the dataset."
+if failed_df.empty:
+
+    st.success(
+        "Great news! No failed transactions are currently "
+        "available in the dataset."
+    )
+
+else:
+
+    priority_transactions = (
+        failed_df
+        .sort_values(
+            by="expected_recovery",
+            ascending=False
+        )
+        .head(5)
+        .copy()
+    )
+
+    priority_transactions["recommended_action"] = np.select(
+        [
+            priority_transactions["retry_count"] >= 2,
+            priority_transactions["recovery_probability"] >= 0.75,
+            priority_transactions["recovery_probability"] >= 0.50
+        ],
+        [
+            "ESCALATE",
+            "RETRY",
+            "SEND REMINDER"
+        ],
+        default="ESCALATE"
+    )
+
+    priority_amount = float(
+        priority_transactions["expected_recovery"].sum()
+    )
+
+    st.markdown(
+        f"""
+        <div style="
+            text-align: center;
+            background: linear-gradient(135deg, #172554, #1E3A8A);
+            border: 1px solid #334E92;
+            border-radius: 16px;
+            padding: 20px;
+            margin: 12px 0 22px 0;
+        ">
+            <div style="
+                color: #BFDBFE;
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 1px;
+            ">
+                HIGH-PRIORITY RECOVERY QUEUE
+            </div>
+
+            <div style="
+                color: #FFFFFF;
+                font-size: 26px;
+                font-weight: 800;
+                margin-top: 6px;
+            ">
+                ₹{priority_amount:,.0f} Recovery Opportunity
+            </div>
+
+            <div style="
+                color: #CBD5E1;
+                font-size: 14px;
+                margin-top: 8px;
+            ">
+                Top {len(priority_transactions)} failed payments ranked by
+                expected revenue recovery.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    priority_display = priority_transactions[
+        [
+            "amount",
+            "payment_method",
+            "failure_reason",
+            "retry_count",
+            "recovery_probability",
+            "expected_recovery",
+            "recommended_action"
+        ]
+    ].copy()
+
+    priority_display.insert(
+        0,
+        "priority_rank",
+        range(1, len(priority_display) + 1)
+    )
+
+    priority_display["amount"] = (
+        "₹"
+        + priority_display["amount"]
+        .round(2)
+        .map("{:,.2f}".format)
+    )
+
+    priority_display["recovery_probability"] = (
+        priority_display["recovery_probability"]
+        .mul(100)
+        .round(1)
+        .map("{:.1f}%".format)
+    )
+
+    priority_display["expected_recovery"] = (
+        "₹"
+        + priority_display["expected_recovery"]
+        .round(2)
+        .map("{:,.2f}".format)
+    )
+
+    priority_display = priority_display.rename(
+        columns={
+            "priority_rank": "Rank",
+            "amount": "Payment Amount",
+            "payment_method": "Payment Method",
+            "failure_reason": "Failure Reason",
+            "retry_count": "Retries",
+            "recovery_probability": "Recovery Probability",
+            "expected_recovery": "Expected Recovery",
+            "recommended_action": "AI Action"
+        }
+    )
+
+    left_space, table_column, right_space = st.columns(
+        [0.35, 4.3, 0.35]
+    )
+
+    with table_column:
+
+        st.markdown(
+            """
+            <div style="
+                text-align: center;
+                color: #E2E8F0;
+                font-size: 20px;
+                font-weight: 750;
+                margin-bottom: 10px;
+            ">
+                Highest-Priority Failed Payments
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-    else:
-        priority_transactions = (
-            failed_df
-            .sort_values(
-                by="expected_recovery",
-                ascending=False
-            )
-            .head(5)
-            .copy()
-        )
-
-        priority_amount = float(
-            priority_transactions["expected_recovery"].sum()
-        )
-
-        p1, p2 = st.columns([1.15, 1.85])
-
-        with p1:
-            st.markdown(
-                f"""
-                <div class="insight-box">
-                    <h3 style="margin-top: 0;">🚀 Act Now</h3>
-
-                    <p style="font-size: 16px;">
-                        Focus on the top
-                        <b>{len(priority_transactions)}</b>
-                        failed transactions first.
-                    </p>
-
-                    <p style="font-size: 22px; font-weight: 800; color: #16A34A;">
-                        ₹{priority_amount:,.0f}
-                    </p>
-
-                    <p class="small-text">
-                        Estimated recovery from the highest-priority payments.
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            if recovery_rate >= 40:
-                st.success(
-                    "Strong recovery potential detected. "
-                    "Prioritize automated retries for high-value payments."
-                )
-            elif recovery_rate >= 25:
-                st.warning(
-                    "Moderate recovery potential. Use reminders "
-                    "before retrying medium-probability payments."
-                )
-            else:
-                st.error(
-                    "Low recovery potential. Escalate high-value "
-                    "failures and offer alternate payment methods."
-                )
-
-        with p2:
-            priority_display = priority_transactions[
-                [
-                    "amount",
-                    "payment_method",
-                    "failure_reason",
-                    "retry_count",
-                    "recovery_probability",
-                    "expected_recovery"
-                ]
-            ].copy()
-
-            priority_display["recovery_probability"] = (
-                priority_display["recovery_probability"]
-                .mul(100)
-                .round(1)
-                .astype(str)
-                + "%"
-            )
-
-            priority_display["amount"] = (
-                "₹"
-                + priority_display["amount"]
-                .round(2)
-                .astype(str)
-            )
-
-            priority_display["expected_recovery"] = (
-                "₹"
-                + priority_display["expected_recovery"]
-                .round(2)
-                .astype(str)
-            )
-
-            priority_display = priority_display.rename(
-                columns={
-                    "amount": "Payment Amount",
-                    "payment_method": "Payment Method",
-                    "failure_reason": "Failure Reason",
-                    "retry_count": "Retry Count",
-                    "recovery_probability": "Recovery Probability",
-                    "expected_recovery": "Expected Recovery"
-                }
-            )
-
-            st.markdown("#### Highest-Priority Failed Payments")
+        with st.container(border=True):
 
             st.dataframe(
                 priority_display,
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                height=255
             )
 
-    st.divider()
+        st.caption(
+            "Payments are ranked by AI-estimated expected recovery value."
+        )
+
+st.divider()
 
     # CHART SECTION
     st.subheader("📊 Revenue Recovery Performance")
