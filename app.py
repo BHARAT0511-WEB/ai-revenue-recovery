@@ -842,6 +842,43 @@ if len(method_analysis) > 0:
         method_analysis["recovery_rate"].idxmin(),
         "payment_method"
     ]
+
+    # Failure Reason Analysis
+    reason_analysis = (
+        failed_df.groupby("failure_reason")
+        .agg(
+            failed_transactions=("failure_reason", "count"),
+            failed_revenue=("amount", "sum")
+        )
+        .reset_index()
+    )
+
+    # Use actual model predictions
+    reason_probability = pd.DataFrame({
+        "failure_reason": failed_df["failure_reason"].values,
+        "recovery_probability": recovery_probability
+    })
+
+    reason_probability = (
+        reason_probability
+        .groupby("failure_reason")["recovery_probability"]
+        .mean()
+        .reset_index()
+    )
+
+    reason_analysis = reason_analysis.merge(
+        reason_probability,
+        on="failure_reason",
+        how="left"
+    )
+
+    reason_analysis["recovery_rate"] = (
+        reason_analysis["recovery_probability"] * 100
+    ).round(2)
+
+    reason_analysis["failed_revenue"] = (
+        reason_analysis["failed_revenue"].round(2)
+    )
     # Best failure reason
     if len(reason_analysis) > 0:
 
