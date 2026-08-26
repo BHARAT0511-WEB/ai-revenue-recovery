@@ -805,19 +805,6 @@ elif page == "AI Insights":
         failed_input
     )[:, 1]
 
-    failed_method_probability = pd.DataFrame({
-        "payment_method": failed_df["payment_method"].values,
-        "recovery_probability": recovery_probability
-    })
-
-    # Model-based recovery probability by payment method
-    method_probability = (
-        failed_method_probability
-        .groupby("payment_method")["recovery_probability"]
-        .mean()
-        .reset_index()
-    )
-
 # Actual failed transaction data by payment method
 method_analysis = (
     failed_df
