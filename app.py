@@ -43,6 +43,7 @@ st.markdown("""
     border-radius: 12px;
     border: 1px solid #e5e7eb;
     background: #fafafa;
+    color: #222222;
     margin-bottom: 12px;
 }
 
