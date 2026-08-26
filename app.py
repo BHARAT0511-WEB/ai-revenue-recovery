@@ -810,6 +810,7 @@ elif page == "AI Insights":
         "recovery_probability": recovery_probability
     })
 
+    # Model-based recovery probability by payment method
     method_probability = (
         failed_method_probability
         .groupby("payment_method")["recovery_probability"]
@@ -817,12 +818,25 @@ elif page == "AI Insights":
         .reset_index()
     )
 
+# Actual failed transaction data by payment method
+method_analysis = (
+    failed_df
+    .groupby("payment_method")
+    .agg(
+        failed_transactions=("payment_method", "count"),
+        failed_revenue=("amount", "sum")
+    )
+    .reset_index()
+)
+
+# Combine actual transaction data with model predictions
 method_analysis = method_analysis.merge(
     method_probability,
     on="payment_method",
     how="left"
 )
 
+# Convert probability to percentage
 method_analysis["recovery_rate"] = (
     method_analysis["recovery_probability"] * 100
 ).round(2)
