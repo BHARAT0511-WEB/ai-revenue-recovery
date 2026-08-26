@@ -800,7 +800,7 @@ elif page == "AI Insights":
 
     failed_input = failed_df[prediction_features].copy()
 
-    recovery_probability = failed_pipeline.predict_proba(
+    recovery_probability = pipeline.predict_proba(
         failed_input
     )[:, 1]
 
