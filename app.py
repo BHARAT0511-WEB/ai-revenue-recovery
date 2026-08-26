@@ -21,80 +21,110 @@ st.set_page_config(
 st.markdown("""
 <style>
     .stApp {
-        background: #F8FAFC;
+        background: #0B1120;
+        color: #E5E7EB;
+    }
+
+    [data-testid="stSidebar"] {
+        background: #111827;
+        border-right: 1px solid #243044;
+    }
+
+    [data-testid="stSidebar"] * {
+        color: #E5E7EB;
     }
 
     .main-title {
-        font-size: 2.4rem;
+        font-size: 42px;
         font-weight: 800;
-        color: #0F172A;
-        margin-bottom: 2px;
+        color: #F8FAFC;
+        margin-bottom: 0;
+        letter-spacing: -1px;
     }
 
     .subtitle {
-        color: #64748B;
-        font-size: 1rem;
+        color: #94A3B8;
+        font-size: 17px;
         margin-bottom: 22px;
     }
 
-    .hero-card {
-        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
-        padding: 24px;
-        border-radius: 16px;
-        color: white;
-        margin: 12px 0 22px 0;
+    .landing-hero {
+        padding: 38px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #172554 0%, #1E3A8A 55%, #312E81 100%);
+        border: 1px solid #334E92;
+        margin-bottom: 28px;
     }
 
-    .hero-card h2 {
-        color: white;
+    .landing-hero h1 {
+        color: #FFFFFF;
+        font-size: 38px;
+        margin: 0 0 10px 0;
+    }
+
+    .landing-hero p {
+        color: #CBD5E1;
+        font-size: 17px;
         margin: 0;
     }
 
-    .hero-card p {
-        color: #DBEAFE;
-        margin-bottom: 0;
+    .dashboard-card {
+        background: #151F32;
+        border: 1px solid #27364F;
+        border-radius: 16px;
+        padding: 22px;
+        min-height: 175px;
+        margin-bottom: 14px;
+    }
+
+    .dashboard-card h3 {
+        color: #F8FAFC;
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+
+    .dashboard-card p {
+        color: #94A3B8;
+        font-size: 14px;
     }
 
     .insight-box {
         padding: 18px;
         border-radius: 14px;
-        border: 1px solid #E2E8F0;
-        background: white;
-        color: #0F172A;
+        border: 1px solid #27364F;
+        background: #151F32;
+        color: #E5E7EB;
         margin-bottom: 12px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
     }
 
     .result-box {
         padding: 22px;
-        border-radius: 16px;
-        border: 1px solid #BBF7D0;
-        background: #F0FDF4;
-        color: #14532D;
+        border-radius: 14px;
+        border: 1px solid #166534;
+        background: #102A22;
+        color: #DCFCE7;
         margin-top: 18px;
     }
 
     div[data-testid="stMetric"] {
-        background: white;
-        border: 1px solid #E2E8F0;
+        background: #151F32;
+        border: 1px solid #27364F;
         padding: 16px;
         border-radius: 14px;
-        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
     }
 
     div[data-testid="stMetricLabel"] {
-        color: #64748B;
+        color: #94A3B8;
     }
 
     div[data-testid="stMetricValue"] {
-        color: #0F172A;
+        color: #F8FAFC;
         font-weight: 700;
     }
 
     .stButton > button {
-        width: 100%;
         border-radius: 10px;
-        border: none;
+        border: 1px solid #3B82F6;
         background: #2563EB;
         color: white;
         font-weight: 700;
@@ -103,8 +133,14 @@ st.markdown("""
 
     .stButton > button:hover {
         background: #1D4ED8;
+        border: 1px solid #60A5FA;
         color: white;
-        border: none;
+    }
+
+    .stDataFrame {
+        border: 1px solid #27364F;
+        border-radius: 12px;
+        overflow: hidden;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -363,23 +399,181 @@ failed_transactions = len(failed_df)
 
 recovered_transactions = len(recovered_df)
 
-# HEADER
+# APP NAVIGATION STATE
+if "app_screen" not in st.session_state:
+    st.session_state.app_screen = "landing"
+
+if "selected_page" not in st.session_state:
+    st.session_state.selected_page = "Overview"
+
+
+# LANDING PAGE
+if st.session_state.app_screen == "landing":
+
+    st.markdown(
+        """
+        <div class="landing-hero">
+            <h1>💰 Revenue Recovery AI</h1>
+            <p>
+                Identify failed payments, predict recovery probability,
+                and take the best revenue recovery action using AI.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("### Choose your workspace")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(
+            """
+            <div class="dashboard-card">
+                <h3>📊 Overview</h3>
+                <p>
+                    View revenue at risk, recovery opportunity,
+                    and the most important payment insights.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if st.button(
+            "Open Revenue Overview",
+            key="open_overview",
+            use_container_width=True
+        ):
+            st.session_state.selected_page = "Overview"
+            st.session_state.app_screen = "dashboard"
+            st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        st.markdown(
+            """
+            <div class="dashboard-card">
+                <h3>📋 Transaction History</h3>
+                <p>
+                    Filter, explore, and review all payment
+                    transaction records in detail.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if st.button(
+            "Open Transaction History",
+            key="open_history",
+            use_container_width=True
+        ):
+            st.session_state.selected_page = "Transaction History"
+            st.session_state.app_screen = "dashboard"
+            st.rerun()
+
+    with col2:
+        st.markdown(
+            """
+            <div class="dashboard-card">
+                <h3>🔍 Payment Analyzer</h3>
+                <p>
+                    Enter a failed payment's details and get an
+                    AI-powered recommendation: retry, remind, or escalate.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if st.button(
+            "Analyze a Payment",
+            key="open_analyzer",
+            use_container_width=True
+        ):
+            st.session_state.selected_page = "Payment Analyzer"
+            st.session_state.app_screen = "dashboard"
+            st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        st.markdown(
+            """
+            <div class="dashboard-card">
+                <h3>🤖 AI Insights</h3>
+                <p>
+                    Discover the best recovery channel, risk areas,
+                    and recommended business strategy.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if st.button(
+            "View AI Insights",
+            key="open_insights",
+            use_container_width=True
+        ):
+            st.session_state.selected_page = "AI Insights"
+            st.session_state.app_screen = "dashboard"
+            st.rerun()
+
+    st.divider()
+
+    a, b, c = st.columns(3)
+
+    with a:
+        st.metric(
+            "Total Transactions",
+            f"{transaction_count:,}"
+        )
+
+    with b:
+        st.metric(
+            "Revenue at Risk",
+            f"₹{failed_revenue:,.0f}"
+        )
+
+    with c:
+        st.metric(
+            "AI Recovery Potential",
+            f"₹{expected_recovery:,.0f}"
+        )
+
+    st.stop()
+
+
+# DASHBOARD HEADER
+page = st.session_state.selected_page
+
 st.markdown(
-    '<div class="main-title">💰 AI Revenue Recovery</div>',
+    '<div class="main-title">💰 Revenue Recovery AI</div>',
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<div class="subtitle">'
-    'AI-powered payment failure recovery and revenue optimization'
-    '</div>',
+    f'<div class="subtitle">Current workspace: {page}</div>',
     unsafe_allow_html=True
 )
 
 st.divider()
 
-# SIDEBAR
-st.sidebar.title("⚙️ Dashboard")
+
+# DASHBOARD SIDEBAR
+st.sidebar.markdown("## 💰 RecoverAI")
+st.sidebar.caption("AI Revenue Recovery Platform")
+
+if st.sidebar.button(
+    "← Back to Dashboard",
+    use_container_width=True
+):
+    st.session_state.app_screen = "landing"
+    st.rerun()
+
+st.sidebar.divider()
 
 page = st.sidebar.radio(
     "Navigate",
@@ -388,8 +582,16 @@ page = st.sidebar.radio(
         "Payment Analyzer",
         "Transaction History",
         "AI Insights"
-    ]
+    ],
+    index=[
+        "Overview",
+        "Payment Analyzer",
+        "Transaction History",
+        "AI Insights"
+    ].index(st.session_state.selected_page)
 )
+
+st.session_state.selected_page = page
 
 st.sidebar.divider()
 
