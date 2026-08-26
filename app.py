@@ -20,45 +20,92 @@ st.set_page_config(
 # PROFESSIONAL STYLING
 st.markdown("""
 <style>
+    .stApp {
+        background: #F8FAFC;
+    }
 
-.main-title {
-    font-size: 40px;
-    font-weight: 800;
-    margin-bottom: 0;
-}
+    .main-title {
+        font-size: 2.4rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin-bottom: 2px;
+    }
 
-.subtitle {
-    color: #6b7280;
-    font-size: 17px;
-    margin-bottom: 20px;
-}
+    .subtitle {
+        color: #64748B;
+        font-size: 1rem;
+        margin-bottom: 22px;
+    }
 
-.section-title {
-    font-size: 25px;
-    font-weight: 700;
-}
+    .hero-card {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
+        padding: 24px;
+        border-radius: 16px;
+        color: white;
+        margin: 12px 0 22px 0;
+    }
 
-.insight-box {
-    padding: 18px;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
-    background: #fafafa;
-    color: #222222;
-    margin-bottom: 12px;
-}
+    .hero-card h2 {
+        color: white;
+        margin: 0;
+    }
 
-.result-box {
-    padding: 22px;
-    border-radius: 14px;
-    border: 1px solid #e5e7eb;
-    margin-top: 18px;
-}
+    .hero-card p {
+        color: #DBEAFE;
+        margin-bottom: 0;
+    }
 
-.small-text {
-    color: #6b7280;
-    font-size: 14px;
-}
+    .insight-box {
+        padding: 18px;
+        border-radius: 14px;
+        border: 1px solid #E2E8F0;
+        background: white;
+        color: #0F172A;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    }
 
+    .result-box {
+        padding: 22px;
+        border-radius: 16px;
+        border: 1px solid #BBF7D0;
+        background: #F0FDF4;
+        color: #14532D;
+        margin-top: 18px;
+    }
+
+    div[data-testid="stMetric"] {
+        background: white;
+        border: 1px solid #E2E8F0;
+        padding: 16px;
+        border-radius: 14px;
+        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+    }
+
+    div[data-testid="stMetricLabel"] {
+        color: #64748B;
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #0F172A;
+        font-weight: 700;
+    }
+
+    .stButton > button {
+        width: 100%;
+        border-radius: 10px;
+        border: none;
+        background: #2563EB;
+        color: white;
+        font-weight: 700;
+        padding: 0.65rem 1rem;
+    }
+
+    .stButton > button:hover {
+        background: #1D4ED8;
+        color: white;
+        border: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -359,119 +406,401 @@ st.sidebar.metric(
 # OVERVIEW
 if page == "Overview":
 
-    st.subheader("📊 Revenue Recovery Overview")
+    st.markdown(
+        f"""
+        <div style="
+            background: linear-gradient(135deg, #0F172A 0%, #1D4ED8 100%);
+            padding: 28px;
+            border-radius: 18px;
+            margin-bottom: 24px;
+            color: white;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+        ">
+            <div style="font-size: 14px; color: #BFDBFE; font-weight: 600;">
+                AI REVENUE RECOVERY COMMAND CENTER
+            </div>
+            <div style="font-size: 30px; font-weight: 800; margin-top: 7px;">
+                Recover more revenue from failed payments
+            </div>
+            <div style="font-size: 16px; color: #DBEAFE; margin-top: 10px;">
+                <b>{failed_transactions:,}</b> failed transactions need attention.
+                AI estimates a recovery opportunity of
+                <b>₹{expected_recovery:,.0f}</b>.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
+    # KPI CARDS
     c1, c2, c3, c4 = st.columns(4)
 
-    with c1:
+    failed_percent = (
+        failed_revenue / total_revenue * 100
+        if total_revenue > 0
+        else 0
+    )
 
+    with c1:
         st.metric(
-            "Total Revenue",
-            f"₹{total_revenue:,.0f}"
+            "💳 Total Revenue",
+            f"₹{total_revenue:,.0f}",
+            f"{transaction_count:,} transactions"
         )
 
     with c2:
-
         st.metric(
-            "Failed Revenue",
-            f"₹{failed_revenue:,.0f}"
+            "⚠️ Revenue at Risk",
+            f"₹{failed_revenue:,.0f}",
+            f"{failed_percent:.1f}% of total revenue",
+            delta_color="inverse"
         )
 
     with c3:
-
         st.metric(
-            "Expected Recovery",
-            f"₹{expected_recovery:,.0f}"
+            "✨ AI Recovery Opportunity",
+            f"₹{expected_recovery:,.0f}",
+            f"{recovery_rate:.1f}% recovery potential"
         )
 
     with c4:
-
         st.metric(
-            "Recovery Rate",
-            f"{recovery_rate:.2f}%"
+            "🤖 Model Accuracy",
+            f"{accuracy * 100:.1f}%",
+            "Held-out test data"
         )
 
     st.divider()
 
-    # Revenue Distribution
-    st.subheader("💰 Revenue Distribution")
+    # ACTION SECTION
+    st.subheader("🎯 Priority Recovery Actions")
 
-    chart_data = pd.DataFrame(
-        {
-            "Revenue": [
-                failed_revenue,
-                actual_recovered_revenue
+    if failed_df.empty:
+        st.success(
+            "Great news! No failed transactions are currently "
+            "available in the dataset."
+        )
+
+    else:
+        priority_transactions = (
+            failed_df
+            .sort_values(
+                by="expected_recovery",
+                ascending=False
+            )
+            .head(5)
+            .copy()
+        )
+
+        priority_amount = float(
+            priority_transactions["expected_recovery"].sum()
+        )
+
+        p1, p2 = st.columns([1.15, 1.85])
+
+        with p1:
+            st.markdown(
+                f"""
+                <div class="insight-box">
+                    <h3 style="margin-top: 0;">🚀 Act Now</h3>
+
+                    <p style="font-size: 16px;">
+                        Focus on the top
+                        <b>{len(priority_transactions)}</b>
+                        failed transactions first.
+                    </p>
+
+                    <p style="font-size: 22px; font-weight: 800; color: #16A34A;">
+                        ₹{priority_amount:,.0f}
+                    </p>
+
+                    <p class="small-text">
+                        Estimated recovery from the highest-priority payments.
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if recovery_rate >= 40:
+                st.success(
+                    "Strong recovery potential detected. "
+                    "Prioritize automated retries for high-value payments."
+                )
+            elif recovery_rate >= 25:
+                st.warning(
+                    "Moderate recovery potential. Use reminders "
+                    "before retrying medium-probability payments."
+                )
+            else:
+                st.error(
+                    "Low recovery potential. Escalate high-value "
+                    "failures and offer alternate payment methods."
+                )
+
+        with p2:
+            priority_display = priority_transactions[
+                [
+                    "amount",
+                    "payment_method",
+                    "failure_reason",
+                    "retry_count",
+                    "recovery_probability",
+                    "expected_recovery"
+                ]
+            ].copy()
+
+            priority_display["recovery_probability"] = (
+                priority_display["recovery_probability"]
+                .mul(100)
+                .round(1)
+                .astype(str)
+                + "%"
+            )
+
+            priority_display["amount"] = (
+                "₹"
+                + priority_display["amount"]
+                .round(2)
+                .astype(str)
+            )
+
+            priority_display["expected_recovery"] = (
+                "₹"
+                + priority_display["expected_recovery"]
+                .round(2)
+                .astype(str)
+            )
+
+            priority_display = priority_display.rename(
+                columns={
+                    "amount": "Payment Amount",
+                    "payment_method": "Payment Method",
+                    "failure_reason": "Failure Reason",
+                    "retry_count": "Retry Count",
+                    "recovery_probability": "Recovery Probability",
+                    "expected_recovery": "Expected Recovery"
+                }
+            )
+
+            st.markdown("#### Highest-Priority Failed Payments")
+
+            st.dataframe(
+                priority_display,
+                use_container_width=True,
+                hide_index=True
+            )
+
+    st.divider()
+
+    # CHART SECTION
+    st.subheader("📊 Revenue Recovery Performance")
+
+    left_chart, right_chart = st.columns(2)
+
+    with left_chart:
+        st.markdown("#### Revenue Distribution")
+
+        revenue_chart = pd.DataFrame(
+            {
+                "Revenue (₹)": [
+                    failed_revenue,
+                    actual_recovered_revenue,
+                    expected_recovery
+                ]
+            },
+            index=[
+                "Revenue at Risk",
+                "Already Recovered",
+                "AI Recovery Opportunity"
             ]
-        },
-        index=[
-            "Failed Revenue",
-            "Recovered Revenue"
+        )
+
+        st.bar_chart(
+            revenue_chart,
+            color="#2563EB"
+        )
+
+        st.caption(
+            "AI Recovery Opportunity is the estimated value "
+            "recoverable from currently failed payments."
+        )
+
+    with right_chart:
+        st.markdown("#### Recovery Opportunity by Payment Method")
+
+        if not failed_df.empty:
+            method_chart = (
+                failed_df
+                .groupby("payment_method")
+                .agg(
+                    expected_recovery=(
+                        "expected_recovery",
+                        "sum"
+                    )
+                )
+                .sort_values(
+                    by="expected_recovery",
+                    ascending=False
+                )
+            )
+
+            st.bar_chart(
+                method_chart,
+                color="#16A34A"
+            )
+        else:
+            st.info("No failed payment methods available to analyze.")
+
+    st.divider()
+
+    # BUSINESS ANALYSIS
+    st.subheader("🔎 Recovery Breakdown")
+
+    tab1, tab2 = st.tabs(
+        [
+            "💳 Payment Methods",
+            "⚠️ Failure Reasons"
         ]
     )
 
-    st.bar_chart(
-        chart_data
-    )
+    with tab1:
 
-    # Payment Method
-    st.subheader("💳 Recovery by Payment Method")
+        if not failed_df.empty:
+            method_analysis = (
+                failed_df
+                .groupby("payment_method")
+                .agg(
+                    failed_transactions=("amount", "count"),
+                    failed_revenue=("amount", "sum"),
+                    expected_recovery=(
+                        "expected_recovery",
+                        "sum"
+                    )
+                )
+                .reset_index()
+            )
 
-    method_analysis = (
-        failed_df
-        .groupby("payment_method")
-        .agg(
-            failed_revenue=("amount", "sum"),
-            expected_recovery=("expected_recovery", "sum"),
-            transactions=("amount", "count")
-        )
-        .reset_index()
-    )
+            method_analysis["recovery_rate"] = (
+                method_analysis["expected_recovery"]
+                .div(method_analysis["failed_revenue"])
+                .mul(100)
+                .round(2)
+            )
 
-    method_analysis["recovery_rate"] = (
-        method_analysis["expected_recovery"]
-        / method_analysis["failed_revenue"]
-        * 100
-    )
+            method_analysis = method_analysis.sort_values(
+                by="expected_recovery",
+                ascending=False
+            )
 
-    st.dataframe(
-        method_analysis,
-        use_container_width=True,
-        hide_index=True
-    )
+            method_display = method_analysis.copy()
 
-    st.bar_chart(
-        method_analysis.set_index(
-            "payment_method"
-        )[
-            ["failed_revenue", "expected_recovery"]
-        ]
-    )
+            method_display["failed_revenue"] = (
+                "₹"
+                + method_display["failed_revenue"]
+                .round(2)
+                .astype(str)
+            )
 
-    # Failure Reasons
-    st.subheader("⚠️ Failure Reason Analysis")
+            method_display["expected_recovery"] = (
+                "₹"
+                + method_display["expected_recovery"]
+                .round(2)
+                .astype(str)
+            )
 
-    reason_analysis = (
-        failed_df
-        .groupby("failure_reason")
-        .agg(
-            transactions=("amount", "count"),
-            failed_revenue=("amount", "sum"),
-            expected_recovery=("expected_recovery", "sum")
-        )
-        .reset_index()
-    )
+            method_display["recovery_rate"] = (
+                method_display["recovery_rate"]
+                .astype(str)
+                + "%"
+            )
 
-    reason_analysis["recovery_rate"] = (
-        reason_analysis["expected_recovery"]
-        / reason_analysis["failed_revenue"]
-        * 100
-    )
+            method_display = method_display.rename(
+                columns={
+                    "payment_method": "Payment Method",
+                    "failed_transactions": "Failed Transactions",
+                    "failed_revenue": "Failed Revenue",
+                    "expected_recovery": "Expected Recovery",
+                    "recovery_rate": "Recovery Rate"
+                }
+            )
 
-    st.dataframe(
-        reason_analysis,
-        use_container_width=True,
-        hide_index=True
-    )
+            st.dataframe(
+                method_display,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("No payment-method data available.")
+
+    with tab2:
+
+        if not failed_df.empty:
+            reason_analysis = (
+                failed_df
+                .groupby("failure_reason")
+                .agg(
+                    failed_transactions=("amount", "count"),
+                    failed_revenue=("amount", "sum"),
+                    expected_recovery=(
+                        "expected_recovery",
+                        "sum"
+                    )
+                )
+                .reset_index()
+            )
+
+            reason_analysis["recovery_rate"] = (
+                reason_analysis["expected_recovery"]
+                .div(reason_analysis["failed_revenue"])
+                .mul(100)
+                .round(2)
+            )
+
+            reason_analysis = reason_analysis.sort_values(
+                by="expected_recovery",
+                ascending=False
+            )
+
+            reason_display = reason_analysis.copy()
+
+            reason_display["failed_revenue"] = (
+                "₹"
+                + reason_display["failed_revenue"]
+                .round(2)
+                .astype(str)
+            )
+
+            reason_display["expected_recovery"] = (
+                "₹"
+                + reason_display["expected_recovery"]
+                .round(2)
+                .astype(str)
+            )
+
+            reason_display["recovery_rate"] = (
+                reason_display["recovery_rate"]
+                .astype(str)
+                + "%"
+            )
+
+            reason_display = reason_display.rename(
+                columns={
+                    "failure_reason": "Failure Reason",
+                    "failed_transactions": "Failed Transactions",
+                    "failed_revenue": "Failed Revenue",
+                    "expected_recovery": "Expected Recovery",
+                    "recovery_rate": "Recovery Rate"
+                }
+            )
+
+            st.dataframe(
+                reason_display,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("No failure-reason data available.")
 
 # PAYMENT ANALYZER
 elif page == "Payment Analyzer":
