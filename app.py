@@ -788,7 +788,22 @@ elif page == "AI Insights":
         .reset_index()
     )
 
-    # Calculate recovery rate from actual model predictions
+    # Generate actual recovery probabilities from the trained model
+    prediction_features = [
+        "amount",
+        "payment_method",
+        "failure_reason",
+        "previous_transactions",
+        "previous_successes",
+        "retry_count"
+    ]
+
+    failed_input = failed_df[prediction_features].copy()
+
+    recovery_probability = failed_pipeline.predict_proba(
+        failed_input
+    )[:, 1]
+
     failed_method_probability = pd.DataFrame({
         "payment_method": failed_df["payment_method"].values,
         "recovery_probability": recovery_probability
