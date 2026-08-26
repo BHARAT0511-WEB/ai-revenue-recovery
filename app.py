@@ -868,8 +868,10 @@ if len(method_analysis) > 0:
     # Use actual model predictions
     reason_probability = pd.DataFrame({
         "failure_reason": failed_df["failure_reason"].values,
-        "recovery_probability": recovery_probability
-    })
+        "recovery_probability": pipeline.predict_proba(
+             failed_input
+        )[:, 1]
+})
 
     reason_probability = (
         reason_probability
