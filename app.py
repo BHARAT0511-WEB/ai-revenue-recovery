@@ -815,6 +815,12 @@ method_analysis = (
     )
     .reset_index()
 )
+ # Calculate model-based recovery probability by payment method
+method_probability = (
+    failed_method_probability
+    .groupby("payment_method", as_index=False)["recovery_probability"]
+    .mean()
+) 
 
 # Combine actual transaction data with model predictions
 method_analysis = method_analysis.merge(
@@ -825,8 +831,8 @@ method_analysis = method_analysis.merge(
 
 # Convert probability to percentage
 method_analysis["recovery_rate"] = (
-    method_analysis["recovery_probability"] * 100
-).round(2)
+    method_analysis["recovery_probability"].fillna(0) * 100
+).round(2) 
 
 method_analysis["failed_revenue"] = (
     method_analysis["failed_revenue"].round(2)
