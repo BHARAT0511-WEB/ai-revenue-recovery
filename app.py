@@ -819,7 +819,9 @@ method_analysis = (
 # Calculate recovery probability by payment method
 failed_method_probability = pd.DataFrame({
     "payment_method": failed_df["payment_method"].values,
-    "recovery_probability": recovery_probability
+    "recovery_probability": pipeline.predict_proba(
+        failed_input
+    )[:, 1]
 })
 
 method_probability = (
