@@ -788,7 +788,7 @@ elif page == "AI Insights":
         .reset_index()
     )
 
-method_analysis["failed_revenue"] = method_analysis["failed_revenue"].round(2)
+    method_analysis["failed_revenue"] = method_analysis["failed_revenue"].round(2)
 
     # Best payment method
     if len(method_analysis) > 0:
