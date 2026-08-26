@@ -835,12 +835,10 @@ if len(method_analysis) > 0:
 
     best_method = method_analysis.loc[
         method_analysis["recovery_rate"].idxmax(),
-        "payment_method"
     ]
 
     worst_method = method_analysis.loc[
         method_analysis["recovery_rate"].idxmin(),
-        "payment_method"
     ]
 
     # Failure Reason Analysis
