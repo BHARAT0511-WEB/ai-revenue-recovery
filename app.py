@@ -788,19 +788,45 @@ elif page == "AI Insights":
         .reset_index()
     )
 
-    method_analysis["failed_revenue"] = method_analysis["failed_revenue"].round(2)
+    # Calculate recovery rate from actual model predictions
+    failed_method_probability = pd.DataFrame({
+        "payment_method": failed_df["payment_method"].values,
+        "recovery_probability": recovery_probability
+    })
 
-    # Best payment method
-    if len(method_analysis) > 0:
+    method_probability = (
+        failed_method_probability
+        .groupby("payment_method")["recovery_probability"]
+        .mean()
+        .reset_index()
+    )
 
-        best_method = method_analysis.loc[
-            method_analysis["recovery_rate"].idxmax()
-        ]
+method_analysis = method_analysis.merge(
+    method_probability,
+    on="payment_method",
+    how="left"
+)
 
-        worst_method = method_analysis.loc[
-            method_analysis["recovery_rate"].idxmin()
-        ]
+method_analysis["recovery_rate"] = (
+    method_analysis["recovery_probability"] * 100
+).round(2)
 
+method_analysis["failed_revenue"] = (
+    method_analysis["failed_revenue"].round(2)
+)
+
+# Best and worst payment method
+if len(method_analysis) > 0:
+
+    best_method = method_analysis.loc[
+        method_analysis["recovery_rate"].idxmax(),
+        "payment_method"
+    ]
+
+    worst_method = method_analysis.loc[
+        method_analysis["recovery_rate"].idxmin(),
+        "payment_method"
+    ]
     # Best failure reason
     if len(reason_analysis) > 0:
 
