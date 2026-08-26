@@ -778,6 +778,18 @@ elif page == "AI Insights":
 
     st.subheader("🤖 AI Revenue Insights")
 
+    # Payment method analysis
+    method_analysis = (
+        failed_df.groupby("payment_method")
+        .agg(
+            failed_transactions=("payment_method", "count"),
+            failed_revenue=("amount", "sum")
+        )
+        .reset_index()
+    )
+
+method_analysis["failed_revenue"] = method_analysis["failed_revenue"].round(2)
+
     # Best payment method
     if len(method_analysis) > 0:
 
