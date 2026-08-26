@@ -899,9 +899,9 @@ if len(method_analysis) > 0:
             <h3>🏆 Best Recovery Channel</h3>
 
             <p>
-            <b>{best_method["payment_method"]}</b>
+            <b>{best_method_name}</b>
             has the highest expected recovery rate of
-            <b>{best_method["recovery_rate"]:.1f}%</b>.
+            <b>{best_method_rate:.1f}%</b>.
             </p>
 
             </div>
@@ -918,9 +918,9 @@ if len(method_analysis) > 0:
             <h3>⚠️ Highest Risk Channel</h3>
 
             <p>
-            <b>{worst_method["payment_method"]}</b>
+            <b>{worst_method_name}</b>
             has the lowest expected recovery rate of
-            <b>{worst_method["recovery_rate"]:.1f}%</b>.
+            <b>{worst_method_name:.1f}%</b>.
             </p>
 
             </div>
