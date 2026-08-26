@@ -822,7 +822,7 @@ else:
             "Payments are ranked by AI-estimated expected recovery value."
         )
 
-st.divider()
+    st.divider()
 
     # CHART SECTION
     st.subheader("📊 Revenue Recovery Performance")
