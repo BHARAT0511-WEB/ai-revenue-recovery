@@ -656,48 +656,48 @@ if page == "Overview":
     st.divider()
 
     # PRIORITY RECOVERY PAYMENTS
-st.subheader("🎯 Priority Recovery Actions")
+    st.subheader("🎯 Priority Recovery Actions")
 
-if failed_df.empty:
+    if failed_df.empty:
 
-    st.success(
-        "Great news! No failed transactions are currently "
-        "available in the dataset."
-    )
-
-else:
-
-    priority_transactions = (
-        failed_df
-        .sort_values(
-            by="expected_recovery",
-            ascending=False
+        st.success(
+            "Great news! No failed transactions are currently "
+            "available in the dataset."
         )
-        .head(5)
-        .copy()
-    )
 
-    priority_transactions["recommended_action"] = np.select(
-        [
-            priority_transactions["retry_count"] >= 2,
-            priority_transactions["recovery_probability"] >= 0.75,
-            priority_transactions["recovery_probability"] >= 0.50
-        ],
-        [
-            "ESCALATE",
-            "RETRY",
-            "SEND REMINDER"
-        ],
-        default="ESCALATE"
-    )
+    else:
 
-    priority_amount = float(
-        priority_transactions["expected_recovery"].sum()
-    )
+        priority_transactions = (
+            failed_df
+            .sort_values(
+                by="expected_recovery",
+                ascending=False
+            )
+            .head(5)
+            .copy()
+        )
+
+        priority_transactions["recommended_action"] = np.select(
+            [
+                priority_transactions["retry_count"] >= 2,
+                priority_transactions["recovery_probability"] >= 0.75,
+                priority_transactions["recovery_probability"] >= 0.50
+            ],
+            [
+                "ESCALATE",
+                "RETRY",
+                "SEND REMINDER"
+            ],
+            default="ESCALATE"
+        )
+
+        priority_amount = float(
+            priority_transactions["expected_recovery"].sum()
+        )
 
     st.markdown(
         f"""
-        <div style="
+            <div style="
             text-align: center;
             background: linear-gradient(135deg, #172554, #1E3A8A);
             border: 1px solid #334E92;
