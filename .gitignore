@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Environment files
+.env
+.venv/
+venv/
+
+# Local datasets containing real data
+private_transactions.csv
+customer_data.csv
+
+# OS files
+.DS_Store
