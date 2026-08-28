@@ -466,6 +466,12 @@ def show_landing(metrics):
     with c3:
         st.metric("AI Recovery Potential", money(metrics["expected_recovery"]))
 
+    st.caption(
+        "Privacy note: This prototype uses anonymized transaction data. "
+        "Do not upload card numbers, CVV, passwords, OTPs, bank credentials, "
+        "or personally identifiable customer information."
+    )
+
 def show_overview(data, failed_data, metrics, accuracy):
 
     st.markdown(f"""
@@ -802,6 +808,17 @@ def show_payment_analyzer(data, pipeline):
         </div>
         """, unsafe_allow_html=True)
 
+       st.info(
+           f"""
+           **Why this recommendation?**
+
+           - Recovery probability: {probability * 100:.1f}%
+           - Previous successful payments: {previous_successes}
+           - Previous payment attempts: {previous_transactions}
+           - Retry attempts already used: {retry_count}
+           - Selected failure reason: {failure_reason}
+           """
+       )
 
 def show_history(data):
 
