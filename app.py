@@ -808,17 +808,17 @@ def show_payment_analyzer(data, pipeline):
         </div>
         """, unsafe_allow_html=True)
 
-       st.info(
-           f"""
-           **Why this recommendation?**
+        st.info(
+            f"""
+            **Why this recommendation?**
 
-           - Recovery probability: {probability * 100:.1f}%
-           - Previous successful payments: {previous_successes}
-           - Previous payment attempts: {previous_transactions}
-           - Retry attempts already used: {retry_count}
-           - Selected failure reason: {failure_reason}
-           """
-       )
+            - Recovery probability: {probability * 100:.1f}%
+            - Previous successful payments: {previous_successes}
+            - Previous payment attempts: {previous_transactions}
+            - Retry attempts already used: {retry_count}
+            - Selected failure reason: {failure_reason}
+            """
+        )
 
 def show_history(data):
 
