@@ -9,10 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
-
-# -------------------------------------------------
 # CONFIG
-# -------------------------------------------------
 st.set_page_config(
     page_title="RecoverAI",
     page_icon="💰",
@@ -48,10 +45,7 @@ TARGET_OPTIONS = [
     "success"
 ]
 
-
-# -------------------------------------------------
 # STYLING
-# -------------------------------------------------
 st.markdown("""
 <style>
     .stApp {
@@ -178,15 +172,46 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
-# -------------------------------------------------
 # DATA AND MODEL
-# -------------------------------------------------
 @st.cache_data
-def load_data():
+def load_default_data():
     return pd.read_csv("transactions.csv")
 
 
+def load_data():
+
+    uploaded_file = st.sidebar.file_uploader(
+        "Upload transaction CSV",
+        type=["csv"],
+        help="Upload a CSV file with the required transaction columns."
+    )
+
+    if uploaded_file is not None:
+
+        if uploaded_file.size > 5 * 1024 * 1024:
+            st.sidebar.error(
+                "File is too large. Maximum allowed size is 5 MB."
+            )
+            st.stop()
+
+        try:
+            uploaded_df = pd.read_csv(uploaded_file)
+
+            if uploaded_df.empty:
+                st.sidebar.error("Uploaded CSV file is empty.")
+                st.stop()
+
+            return uploaded_df
+
+        except Exception:
+            st.sidebar.error(
+                "Unable to read the uploaded CSV. "
+                "Please upload a valid CSV file."
+            )
+            st.stop()
+
+    return load_default_data()
+    
 def clean_target(series):
     mapping = {
         "yes": 1,
@@ -279,13 +304,9 @@ def train_model(data):
 
     return pipeline, accuracy, target_column
 
-
-# -------------------------------------------------
 # HELPERS
-# -------------------------------------------------
 def money(value):
     return f"₹{value:,.0f}"
-
 
 def get_action(probability, retry_count):
 
@@ -300,7 +321,6 @@ def get_action(probability, retry_count):
 
     return "ESCALATE", "Low probability. Offer alternate payment options."
 
-
 def action_column(data):
     return np.select(
         [
@@ -311,7 +331,6 @@ def action_column(data):
         ["ESCALATE", "RETRY", "SEND REMINDER"],
         default="ESCALATE"
     )
-
 
 def format_table(data, columns):
 
@@ -342,7 +361,6 @@ def format_table(data, columns):
 
     return output
 
-
 def grouped_analysis(data, group_column):
 
     analysis = (
@@ -368,10 +386,7 @@ def grouped_analysis(data, group_column):
         ascending=False
     )
 
-
-# -------------------------------------------------
 # PAGE FUNCTIONS
-# -------------------------------------------------
 def show_landing(metrics):
 
     st.markdown("""
@@ -450,7 +465,6 @@ def show_landing(metrics):
 
     with c3:
         st.metric("AI Recovery Potential", money(metrics["expected_recovery"]))
-
 
 def show_overview(data, failed_data, metrics, accuracy):
 
@@ -567,6 +581,18 @@ def show_overview(data, failed_data, metrics, accuracy):
                 hide_index=True,
                 height=250
             )
+
+    csv_data = priority.to_csv(
+        index=False
+    ).encode("utf-8")
+
+    st.download_button(
+        label="⬇️ Download Priority Recovery Queue",
+        data=csv_data,
+        file_name="priority_recovery_queue.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
 
     st.divider()
     st.subheader("📊 Revenue Recovery Performance")
@@ -716,6 +742,25 @@ def show_payment_analyzer(data, pipeline):
 
     if st.button("🚀 Analyze Payment", use_container_width=True):
 
+        if amount <= 0:
+            st.error("Payment amount must be greater than ₹0.")
+            st.stop()
+
+        if amount > 10000000:
+            st.error("Payment amount is above the allowed limit.")
+            st.stop()
+
+        if previous_successes > previous_transactions:
+            st.error(
+                "Previous successful transactions cannot be greater than "
+                "total previous transactions."
+            )
+            st.stop()
+
+        if retry_count > 10:
+            st.error("Retry count cannot be greater than 10.")
+            st.stop()
+       
         input_data = pd.DataFrame([{
             "amount": amount,
             "payment_method": payment_method,
@@ -826,7 +871,6 @@ def show_history(data):
         hide_index=True
     )
 
-
 def show_ai_insights(failed_data, metrics, accuracy):
 
     st.subheader("🤖 AI Revenue Insights")
@@ -914,10 +958,7 @@ def show_ai_insights(failed_data, metrics, accuracy):
     - Estimated recovery rate: **{metrics["recovery_rate"]:.1f}%**.
     """)
 
-
-# -------------------------------------------------
 # APP SETUP
-# -------------------------------------------------
 try:
     df = load_data()
     pipeline, accuracy, target_column = train_model(df)
@@ -970,10 +1011,7 @@ metrics = {
     )
 }
 
-
-# -------------------------------------------------
 # NAVIGATION
-# -------------------------------------------------
 if "app_screen" not in st.session_state:
     st.session_state.app_screen = "landing"
 
@@ -1010,10 +1048,7 @@ st.sidebar.divider()
 st.sidebar.metric("Transactions", f"{metrics['transactions']:,}")
 st.sidebar.metric("Model Accuracy", f"{accuracy * 100:.1f}%")
 
-
-# -------------------------------------------------
 # PAGE ROUTER
-# -------------------------------------------------
 if page == "Overview":
     show_overview(df_analysis, failed_df, metrics, accuracy)
 
