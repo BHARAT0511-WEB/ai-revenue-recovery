@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
@@ -305,32 +306,198 @@ def train_model(data):
     return pipeline, accuracy, target_column
 
 # HELPERS
+def simulate_recovery_outcome(probability, action, payment_id):
+    seed = sum(ord(char) for char in str(payment_id))
+    rng = np.random.default_rng(seed)
+
+    action_multiplier = {
+        "SCHEDULE_RETRY": 1.10,
+        "SEND_REMINDER": 1.05,
+        "SEND_PAYMENT_LINK": 1.12,
+        "REQUEST_PAYMENT_UPDATE": 0.92,
+        "ESCALATE": 0.70,
+        "HUMAN_REVIEW": 0.65,
+        "WAIT": 0.00,
+        "DO_NOT_CONTACT": 0.00
+    }
+
+    multiplier = action_multiplier.get(action, 1.0)
+
+    adjusted_probability = min(
+        probability * multiplier,
+        0.95
+    )
+
+    recovered = rng.random() < adjusted_probability
+
+    return recovered, adjusted_probability
+    
 def money(value):
     return f"₹{value:,.0f}"
 
-def get_action(probability, retry_count):
+def get_action(
+    probability,
+    retry_count,
+    failure_reason,
+    consent,
+    opted_out,
+    last_attempt_hours_ago,
+    amount
+):
+    hard_failures = [
+        "hard_decline",
+        "blocked_card",
+        "fraud_suspected"
+    ]
+
+    technical_failures = [
+        "bank_timeout",
+        "gateway_error",
+        "network_error",
+        "technical_error"
+    ]
+
+    if opted_out:
+        return {
+            "action": "DO_NOT_CONTACT",
+            "reason": "Customer opted out of recovery communication.",
+            "policy_status": "BLOCKED",
+            "next_step": "No automated outreach."
+        }
+
+    if not consent:
+        return {
+            "action": "HUMAN_REVIEW",
+            "reason": "Communication consent is unavailable.",
+            "policy_status": "BLOCKED",
+            "next_step": "Do not send an automated message."
+        }
+
+    if amount >= 50000:
+        return {
+            "action": "HUMAN_REVIEW",
+            "reason": "High-value transaction requires manual review.",
+            "policy_status": "ESCALATED",
+            "next_step": "Send case to recovery specialist."
+        }
+
+    if failure_reason in hard_failures:
+        return {
+            "action": "ESCALATE",
+            "reason": "Hard decline or risk-related failure cannot be auto-retried.",
+            "policy_status": "BLOCKED",
+            "next_step": "Create a human-review case."
+        }
 
     if retry_count >= 2:
-        return "ESCALATE", "Retry limit reached. Escalation is recommended."
+        return {
+            "action": "ESCALATE",
+            "reason": "Maximum automatic retry limit reached.",
+            "policy_status": "BLOCKED",
+            "next_step": "Stop retries and route to human support."
+        }
 
-    if probability >= 0.75:
-        return "RETRY", "High recovery probability. Retry immediately."
+    if last_attempt_hours_ago < 24:
+        return {
+            "action": "WAIT",
+            "reason": "Cooldown period is active; avoid repeated outreach.",
+            "policy_status": "BLOCKED",
+            "next_step": "Re-evaluate after 24 hours."
+        }
 
-    if probability >= 0.50:
-        return "REMINDER", "Moderate probability. Send a reminder before retry."
+    if failure_reason == "expired_card":
+        return {
+            "action": "REQUEST_PAYMENT_UPDATE",
+            "reason": "The saved card may be expired.",
+            "policy_status": "ALLOWED",
+            "next_step": "Send a secure payment-method update link."
+        }
 
-    return "ESCALATE", "Low probability. Offer alternate payment options."
+    if failure_reason in ["authentication_failed", "3ds_failed"]:
+        return {
+            "action": "SEND_PAYMENT_LINK",
+            "reason": "Customer authentication is required to complete payment.",
+            "policy_status": "ALLOWED",
+            "next_step": "Send a secure payment link."
+        }
 
-def action_column(data):
-    return np.select(
-        [
-            data["retry_count"] >= 2,
-            data["recovery_probability"] >= 0.75,
-            data["recovery_probability"] >= 0.50
-        ],
-        ["ESCALATE", "RETRY", "SEND REMINDER"],
-        default="ESCALATE"
+    if failure_reason in ["upi_pending", "checkout_abandoned"]:
+        return {
+            "action": "SEND_REMINDER",
+            "reason": "Customer may complete the payment with a reminder.",
+            "policy_status": "ALLOWED",
+            "next_step": "Send a payment reminder with a secure link."
+        }
+
+    if failure_reason in technical_failures and probability >= 0.50:
+        return {
+            "action": "SCHEDULE_RETRY",
+            "reason": "Temporary technical issue; one bounded retry is appropriate.",
+            "policy_status": "ALLOWED",
+            "next_step": "Retry after 6 hours."
+        }
+
+    if probability >= 0.60:
+        return {
+            "action": "SEND_PAYMENT_LINK",
+            "reason": "Recovery probability is moderate to high.",
+            "policy_status": "ALLOWED",
+            "next_step": "Send a secure alternate payment link."
+        }
+
+    return {
+        "action": "ESCALATE",
+        "reason": "Recovery probability is low; avoid repeated automated actions.",
+        "policy_status": "ESCALATED",
+        "next_step": "Route to support/recovery team."
+    }
+
+def simulate_recovery_outcome(probability, action, payment_id):
+    seed = sum(ord(character) for character in str(payment_id))
+
+    rng = np.random.default_rng(seed)
+
+    action_multiplier = {
+        "SCHEDULE_RETRY": 1.10,
+        "SEND_REMINDER": 1.05,
+        "SEND_PAYMENT_LINK": 1.12,
+        "REQUEST_PAYMENT_UPDATE": 0.92,
+        "ESCALATE": 0.70,
+        "HUMAN_REVIEW": 0.65,
+        "WAIT": 0.00,
+        "DO_NOT_CONTACT": 0.00
+    }
+
+    multiplier = action_multiplier.get(action, 1.0)
+
+    adjusted_probability = min(
+        probability * multiplier,
+        0.95
     )
+
+    recovered = rng.random() < adjusted_probability
+
+    return recovered, adjusted_probability
+    
+def action_column(data):
+
+    actions = []
+
+    for _, row in data.iterrows():
+
+        decision = get_action(
+            probability=row["recovery_probability"],
+            retry_count=row["retry_count"],
+            failure_reason=row["failure_reason"],
+            consent=True,
+            opted_out=False,
+            last_attempt_hours_ago=24,
+            amount=row["amount"]
+        )
+
+        actions.append(decision["action"])
+
+    return actions
 
 def format_table(data, columns):
 
@@ -425,6 +592,18 @@ def show_landing(metrics):
             "Find the best payment channels and most recoverable failure types.",
             "View AI Insights",
             "AI Insights"
+        ),
+        (
+            "⚡ Recovery Agent",
+            "Run safe AI recovery actions, simulate outcomes, and track recovered revenue.",
+            "Open Recovery Agent",
+            "Recovery Agent"
+        )
+        (
+            "📜 Audit Logs",
+            "Review every AI decision, policy check, recovery action, and outcome.",
+            "Open Audit Logs",
+            "Audit Logs"
         )
     ]
 
@@ -526,7 +705,7 @@ def show_overview(data, failed_data, metrics, accuracy):
             .copy()
         )
 
-        priority["AI Action"] = action_column(priority)
+        priority["AI Action"] = priority["action"]
         priority.insert(0, "Rank", range(1, len(priority) + 1))
 
         priority_total = priority["expected_recovery"].sum()
@@ -781,7 +960,21 @@ def show_payment_analyzer(data, pipeline):
         )
 
         expected = amount * probability
-        action, reason = get_action(probability, retry_count)
+
+        decision = get_action(
+            probability=probability,
+            retry_count=retry_count,
+            failure_reason=failure_reason,
+            consent=True,
+            opted_out=False,
+            last_attempt_hours_ago=24,
+            amount=amount
+        )
+
+action = decision["action"]
+reason = decision["reason"]
+policy_status = decision["policy_status"]
+next_step = decision["next_step"]
 
         st.divider()
 
@@ -801,10 +994,12 @@ def show_payment_analyzer(data, pipeline):
 
         st.markdown(f"""
         <div class="result-box">
-            <h3>🤖 AI Recommendation</h3>
-            <p><b>Action:</b> {action}</p>
-            <p><b>Reason:</b> {reason}</p>
-            <p><b>Expected Revenue Recovery:</b> ₹{expected:,.2f}</p>
+            <h3>🤖 AI Recovery Decision</h3>
+            <p><b>Recommended Action:</b> {action}</p>
+            <p><b>Policy Status:</b> {policy_status}</p>
+            <p><b>Decision Reason:</b> {reason}</p>
+            <p><b>Next Step:</b> {next_step}</p>
+            <p><b>Predicted Recovery Opportunity:</b> ₹{expected:,.2f}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -975,6 +1170,393 @@ def show_ai_insights(failed_data, metrics, accuracy):
     - Estimated recovery rate: **{metrics["recovery_rate"]:.1f}%**.
     """)
 
+def show_recovery_agent(failed_data):
+
+    st.subheader("⚡ Recovery Agent")
+
+    st.caption(
+        "Run policy-controlled recovery actions on failed payments "
+        "using a simulated recovery executor."
+    )
+
+    if failed_data.empty:
+        st.success("No failed payments require recovery action.")
+        return
+
+    actionable = failed_data[
+        failed_data["policy_status"] == "ALLOWED"
+    ].copy()
+    
+    st.divider()
+    st.subheader("🛡️ Blocked and Escalated Cases")
+
+    if blocked.empty:
+        st.success("No recovery cases were blocked by policy.")
+    else:
+        blocked_display = format_table(
+            blocked,
+            [
+                "payment_id",
+                "amount",
+                "failure_reason",
+                "retry_count",
+                "action",
+                "policy_status",
+                "reason",
+                "next_step"
+            ]
+        ).rename(columns={
+            "payment_id": "Payment ID",
+            "amount": "Amount",
+            "failure_reason": "Failure Reason",
+            "retry_count": "Previous Retries",
+            "action": "Agent Decision",
+            "policy_status": "Policy Status",
+            "reason": "Why Blocked / Escalated",
+            "next_step": "Next Step"
+        })
+
+        st.dataframe(
+            blocked_display,
+            use_container_width=True,
+            hide_index=True
+        )
+    
+    blocked = failed_data[
+        failed_data["policy_status"] != "ALLOWED"
+    ].copy()
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.metric("Actionable Payments", f"{len(actionable):,}")
+
+    with c2:
+        st.metric("Blocked / Escalated", f"{len(blocked):,}")
+
+    with c3:
+        st.metric(
+            "Actionable Revenue",
+            money(float(actionable["amount"].sum()))
+        )
+
+    st.divider()
+    st.subheader("🎯 AI Recovery Queue")
+
+    if actionable.empty:
+        st.warning(
+            "No payments are currently eligible for automated recovery. "
+            "All cases are blocked, waiting, or escalated."
+        )
+    else:
+        display = format_table(
+            actionable,
+            [
+                "payment_id",
+                "amount",
+                "payment_method",
+                "failure_reason",
+                "retry_count",
+                "recovery_probability",
+                "expected_recovery",
+                "action",
+                "reason",
+                "next_step"
+            ]
+        ).rename(columns={
+            "payment_id": "Payment ID",
+            "amount": "Amount",
+            "payment_method": "Payment Method",
+            "failure_reason": "Failure Reason",
+            "retry_count": "Previous Retries",
+            "recovery_probability": "Recovery Probability",
+            "expected_recovery": "Predicted Recovery Value",
+            "action": "Recommended Action",
+            "reason": "Decision Reason",
+            "next_step": "Next Step"
+        })
+
+        st.dataframe(
+            display,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    st.divider()
+    st.subheader("▶ Execute Simulated Recovery")
+
+    st.info(
+        "Demo mode: This prototype does not trigger real payments, emails, "
+        "or WhatsApp messages. It simulates recovery outcomes using synthetic data."
+    )
+
+    if st.button(
+        "▶ Run Simulated Recovery Batch",
+        use_container_width=True,
+        disabled=actionable.empty
+    ):
+
+        results = actionable.copy()
+
+        simulation = results.apply(
+            lambda row: simulate_recovery_outcome(
+                probability=row["recovery_probability"],
+                action=row["action"],
+                payment_id=row["payment_id"]
+            ),
+            axis=1
+        )
+
+        results["simulated_recovered"] = simulation.map(
+            lambda outcome: outcome[0]
+        )
+
+        results["adjusted_probability"] = simulation.map(
+            lambda outcome: outcome[1]
+        )
+
+        results["recovered_amount"] = np.where(
+            results["simulated_recovered"],
+            results["amount"],
+            0
+        )
+
+        results["execution_status"] = np.where(
+            results["simulated_recovered"],
+            "RECOVERED",
+            "NOT_RECOVERED"
+        )
+
+        results["event_time"] = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+        results["agent_name"] = "RecoverAI Recovery Agent"
+
+        results["decision_reason"] = results["reason"]
+
+        results["risk_level"] = np.select(
+            [
+                results["recovery_probability"] >= 0.75,
+                results["recovery_probability"] >= 0.50
+            ],
+            [
+                "HIGH_RECOVERY_OPPORTUNITY",
+                "MEDIUM_RECOVERY_OPPORTUNITY"
+            ],
+            default="LOW_RECOVERY_OPPORTUNITY"
+        )
+
+        audit_columns = [
+            "event_time",
+            "agent_name",
+            "payment_id",
+            "amount",
+            "payment_method",
+            "failure_reason",
+            "recovery_probability",
+            "risk_level",
+            "action",
+            "policy_status",
+            "decision_reason",
+            "next_step",
+            "execution_status",
+            "recovered_amount"
+        ]
+
+        audit_log = results[audit_columns].copy()
+
+        st.session_state.recovery_results = results
+        st.session_state.audit_log = audit_log
+
+        st.success("Recovery batch simulation completed successfully.")
+        st.rerun()
+
+    if "recovery_results" in st.session_state:
+
+        results = st.session_state.recovery_results.copy()
+
+        recovered_count = int(results["simulated_recovered"].sum())
+        recovered_amount = float(results["recovered_amount"].sum())
+
+        recovery_rate = (
+            recovered_count / len(results) * 100
+            if len(results) > 0 else 0
+        )
+
+        st.divider()
+        st.subheader("📈 Recovery Execution Results")
+
+        r1, r2, r3, r4 = st.columns(4)
+
+        with r1:
+            st.metric(
+                "Payments Processed",
+                f"{len(results):,}"
+            )
+
+        with r2:
+            st.metric(
+                "Payments Recovered",
+                f"{recovered_count:,}"
+            )
+
+        with r3:
+            st.metric(
+                "Recovered Revenue",
+                money(recovered_amount)
+            )
+
+        with r4:
+            st.metric(
+                "Recovery Rate",
+                f"{recovery_rate:.1f}%"
+            )
+
+        result_display = format_table(
+            results,
+            [
+                "payment_id",
+                "amount",
+                "failure_reason",
+                "recovery_probability",
+                "action",
+                "execution_status",
+                "recovered_amount"
+            ]
+        ).rename(columns={
+            "payment_id": "Payment ID",
+            "amount": "Amount",
+            "failure_reason": "Failure Reason",
+            "recovery_probability": "Recovery Probability",
+            "action": "Action Taken",
+            "execution_status": "Outcome",
+            "recovered_amount": "Recovered Amount"
+        })
+
+        st.dataframe(
+            result_display,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        csv_data = results.to_csv(index=False).encode("utf-8")
+
+        st.download_button(
+            label="⬇️ Download Recovery Results",
+            data=csv_data,
+            file_name="recovery_execution_results.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+        def show_audit_logs():
+
+            st.subheader("📜 Recovery Audit Logs")
+
+            st.caption(
+                "A complete record of AI recovery decisions, policy checks, "
+                "simulated actions, and recovery outcomes."
+            )
+
+            if "audit_log" not in st.session_state:
+                st.info(
+                    "No audit records are available yet. "
+                    "Open Recovery Agent and run a simulated recovery batch."
+                )
+                return
+
+            audit_log = st.session_state.audit_log.copy()
+
+            c1, c2, c3, c4 = st.columns(4)
+
+            with c1:
+                 st.metric(
+                     "Total Decisions",
+                     f"{len(audit_log):,}"
+            )
+
+            with c2:
+                allowed_count = int(
+                    (audit_log["policy_status"] == "ALLOWED").sum()
+                )
+                st.metric(
+                    "Actions Allowed",
+                    f"{allowed_count:,}"
+                )
+
+            with c3:
+                recovered_count = int(
+                    (audit_log["execution_status"] == "RECOVERED").sum()
+                )
+                st.metric(
+                    "Recovered Payments",
+                    f"{recovered_count:,}"
+                )
+
+            with c4:
+                recovered_amount = float(
+                    audit_log["recovered_amount"].sum()
+                )
+                st.metric(
+                    "Recovered Revenue",
+                    money(recovered_amount)
+                )
+
+            st.divider()
+
+            st.subheader("Decision and Execution Trail")
+
+            display = format_table(
+                audit_log,
+                [
+                    "event_time",
+                    "payment_id",
+                    "amount",
+                    "payment_method",
+                    "failure_reason",
+                    "recovery_probability",
+                    "risk_level",
+                    "action",
+                    "policy_status",
+                    "decision_reason",
+                    "next_step",
+                    "execution_status",
+                    "recovered_amount"
+                ]
+            ).rename(columns={
+                "event_time": "Timestamp",
+                "payment_id": "Payment ID",
+                "amount": "Payment Amount",
+                "payment_method": "Payment Method",
+                "failure_reason": "Failure Reason",
+                "recovery_probability": "Recovery Probability",
+                "risk_level": "Opportunity Level",
+                "action": "Agent Action",
+                "policy_status": "Policy Status",
+                "decision_reason": "Decision Reason",
+                "next_step": "Next Step",
+                "execution_status": "Execution Outcome",
+                "recovered_amount": "Recovered Amount"
+            })
+
+            st.dataframe(
+                display,
+                use_container_width=True,
+                hide_index=True,
+                height=4 50
+            )
+
+            csv_data = audit_log.to_csv(index=False).encode("utf-8")
+
+            st.download_button(
+                label="⬇️ Download Complete Audit Log",
+                data=csv_data,
+                file_name="recoverai_audit_log.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
 # APP SETUP
 try:
     df = load_data()
@@ -987,6 +1569,11 @@ except Exception as error:
 
 
 df_analysis = df.copy()
+if "payment_id" not in df_analysis.columns:
+    df_analysis["payment_id"] = [
+        f"PAY_{index + 1:04d}"
+        for index in range(len(df_analysis))
+    ]
 df_analysis["_target"] = clean_target(df_analysis[target_column])
 
 df_analysis = df_analysis[
@@ -1008,6 +1595,44 @@ df_analysis["expected_recovery"] = (
 )
 
 failed_df = df_analysis[df_analysis["_target"] == 0].copy()
+
+# Create an AI recovery plan for every failed payment
+def create_recovery_plan(row):
+    decision = get_action(
+        probability=row["recovery_probability"],
+        retry_count=row["retry_count"],
+        failure_reason=row["failure_reason"],
+        consent=True,
+        opted_out=False,
+        last_attempt_hours_ago=24,
+        amount=row["amount"]
+    )
+
+    return pd.Series(decision)
+
+recovery_plan = failed_df.apply(
+    create_recovery_plan,
+    axis=1
+)
+
+failed_df = pd.concat(
+    [failed_df, recovery_plan],
+    axis=1
+)
+
+st.write(
+    failed_df[
+        [
+            "amount",
+            "failure_reason",
+            "recovery_probability",
+            "action",
+            "policy_status",
+            "next_step"
+        ]
+    ].head()
+)
+
 recovered_df = df_analysis[df_analysis["_target"] == 1].copy()
 
 total_revenue = float(df_analysis["amount"].sum())
@@ -1077,3 +1702,9 @@ elif page == "Transaction History":
 
 elif page == "AI Insights":
     show_ai_insights(failed_df, metrics, accuracy)
+
+elif page == "Recovery Agent":
+    show_recovery_agent(failed_df)
+
+elif page == "Audit Logs":
+    show_audit_logs()
