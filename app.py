@@ -24,14 +24,18 @@ FEATURES = [
     "failure_reason",
     "previous_transactions",
     "previous_successes",
-    "retry_count"
+    "retry_count",
+    "last_attempt_hours_ago",
+    "customer_tenure_days"
 ]
 
 NUMERIC_FEATURES = [
     "amount",
     "previous_transactions",
     "previous_successes",
-    "retry_count"
+    "retry_count",
+    "last_attempt_hours_ago",
+    "customer_tenure_days"
 ]
 
 CATEGORICAL_FEATURES = [
@@ -925,6 +929,30 @@ def show_payment_analyzer(data, pipeline):
             value=0
         )
 
+        communication_consent = st.checkbox(
+            "Customer has communication consent",
+            value=True
+        )
+
+        customer_tenure_days = st.number_input(
+            "Customer Tenure (Days)",
+            min_value=1,
+            value=180,
+            step=1
+        )
+        
+        customer_opted_out = st.checkbox(
+            "Customer opted out of recovery messages",
+            value=False
+        )
+
+        last_attempt_hours_ago = st.number_input(
+            "Hours Since Last Recovery Attempt",
+            min_value=0,
+            value=24,
+            step=1
+        )
+
     if st.button("🚀 Analyze Payment", use_container_width=True):
 
         if amount <= 0:
@@ -965,9 +993,9 @@ def show_payment_analyzer(data, pipeline):
             probability=probability,
             retry_count=retry_count,
             failure_reason=failure_reason,
-            consent=True,
-            opted_out=False,
-            last_attempt_hours_ago=24,
+            consent=communication_consent,
+            opted_out=customer_opted_out,
+            last_attempt_hours_ago=last_attempt_hours_ago,
             amount=amount
         )
 
