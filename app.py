@@ -1484,113 +1484,115 @@ def show_recovery_agent(failed_data):
             use_container_width=True
         )
 
-        def show_audit_logs():
+def show_audit_logs():
 
-            st.subheader("📜 Recovery Audit Logs")
+    st.subheader("📜 Recovery Audit Logs")
 
-            st.caption(
-                "A complete record of AI recovery decisions, policy checks, "
-                "simulated actions, and recovery outcomes."
-            )
+    st.caption(
+        "A complete record of AI recovery decisions, policy checks, "
+        "simulated actions, and recovery outcomes."
+    )
 
-            if "audit_log" not in st.session_state:
-                st.info(
-                    "No audit records are available yet. "
-                    "Open Recovery Agent and run a simulated recovery batch."
-                )
-                return
+    if "audit_log" not in st.session_state:
+        st.info(
+            "No audit records are available yet. "
+            "Open Recovery Agent and run a simulated recovery batch."
+        )
+        return
 
-            audit_log = st.session_state.audit_log.copy()
+    audit_log = st.session_state.audit_log.copy()
 
-            c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4 = st.columns(4)
 
-            with c1:
-                 st.metric(
-                     "Total Decisions",
-                     f"{len(audit_log):,}"
-            )
+    with c1:
+        st.metric(
+            "Total Decisions",
+            f"{len(audit_log):,}"
+        )
 
-            with c2:
-                allowed_count = int(
-                    (audit_log["policy_status"] == "ALLOWED").sum()
-                )
-                st.metric(
-                    "Actions Allowed",
-                    f"{allowed_count:,}"
-                )
+    with c2:
+        allowed_count = int(
+            (audit_log["policy_status"] == "ALLOWED").sum()
+        )
 
-            with c3:
-                recovered_count = int(
-                    (audit_log["execution_status"] == "RECOVERED").sum()
-                )
-                st.metric(
-                    "Recovered Payments",
-                    f"{recovered_count:,}"
-                )
+        st.metric(
+            "Actions Allowed",
+            f"{allowed_count:,}"
+        )
 
-            with c4:
-                recovered_amount = float(
-                    audit_log["recovered_amount"].sum()
-                )
-                st.metric(
-                    "Recovered Revenue",
-                    money(recovered_amount)
-                )
+    with c3:
+        recovered_count = int(
+            (audit_log["execution_status"] == "RECOVERED").sum()
+        )
 
-            st.divider()
+        st.metric(
+            "Recovered Payments",
+            f"{recovered_count:,}"
+        )
 
-            st.subheader("Decision and Execution Trail")
+    with c4:
+        recovered_amount = float(
+            audit_log["recovered_amount"].sum()
+        )
 
-            display = format_table(
-                audit_log,
-                [
-                    "event_time",
-                    "payment_id",
-                    "amount",
-                    "payment_method",
-                    "failure_reason",
-                    "recovery_probability",
-                    "risk_level",
-                    "action",
-                    "policy_status",
-                    "decision_reason",
-                    "next_step",
-                    "execution_status",
-                    "recovered_amount"
-                ]
-            ).rename(columns={
-                "event_time": "Timestamp",
-                "payment_id": "Payment ID",
-                "amount": "Payment Amount",
-                "payment_method": "Payment Method",
-                "failure_reason": "Failure Reason",
-                "recovery_probability": "Recovery Probability",
-                "risk_level": "Opportunity Level",
-                "action": "Agent Action",
-                "policy_status": "Policy Status",
-                "decision_reason": "Decision Reason",
-                "next_step": "Next Step",
-                "execution_status": "Execution Outcome",
-                "recovered_amount": "Recovered Amount"
-            })
+        st.metric(
+            "Recovered Revenue",
+            money(recovered_amount)
+        )
 
-            st.dataframe(
-                display,
-                use_container_width=True,
-                hide_index=True,
-                height=450
-            )
+    st.divider()
+    st.subheader("Decision and Execution Trail")
 
-            csv_data = audit_log.to_csv(index=False).encode("utf-8")
+    display = format_table(
+        audit_log,
+        [
+            "event_time",
+            "payment_id",
+            "amount",
+            "payment_method",
+            "failure_reason",
+            "recovery_probability",
+            "risk_level",
+            "action",
+            "policy_status",
+            "decision_reason",
+            "next_step",
+            "execution_status",
+            "recovered_amount"
+        ]
+    ).rename(columns={
+        "event_time": "Timestamp",
+        "payment_id": "Payment ID",
+        "amount": "Payment Amount",
+        "payment_method": "Payment Method",
+        "failure_reason": "Failure Reason",
+        "recovery_probability": "Recovery Probability",
+        "risk_level": "Opportunity Level",
+        "action": "Agent Action",
+        "policy_status": "Policy Status",
+        "decision_reason": "Decision Reason",
+        "next_step": "Next Step",
+        "execution_status": "Execution Outcome",
+        "recovered_amount": "Recovered Amount"
+    })
 
-            st.download_button(
-                label="⬇️ Download Complete Audit Log",
-                data=csv_data,
-                file_name="recoverai_audit_log.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+    st.dataframe(
+        display,
+        use_container_width=True,
+        hide_index=True,
+        height=450
+    )
 
+    csv_data = audit_log.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label="⬇️ Download Complete Audit Log",
+        data=csv_data,
+        file_name="recoverai_audit_log.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+    
 # APP SETUP
 try:
     df = load_data()
