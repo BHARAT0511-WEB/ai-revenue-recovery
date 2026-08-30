@@ -1572,7 +1572,7 @@ def show_recovery_agent(failed_data):
                 display,
                 use_container_width=True,
                 hide_index=True,
-                height=4 50
+                height=450
             )
 
             csv_data = audit_log.to_csv(index=False).encode("utf-8")
