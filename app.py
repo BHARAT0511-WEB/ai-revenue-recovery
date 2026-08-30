@@ -980,7 +980,9 @@ def show_payment_analyzer(data, pipeline):
             "failure_reason": failure_reason,
             "previous_transactions": previous_transactions,
             "previous_successes": previous_successes,
-            "retry_count": retry_count
+            "retry_count": retry_count,
+            "last_attempt_hours_ago": last_attempt_hours_ago,
+            "customer_tenure_days": customer_tenure_days
         }])
 
         probability = float(
