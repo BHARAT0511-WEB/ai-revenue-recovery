@@ -1217,6 +1217,10 @@ def show_recovery_agent(failed_data):
         failed_data["policy_status"] == "ALLOWED"
     ].copy()
     
+    blocked = failed_data[
+        failed_data["policy_status"] != "ALLOWED"
+    ].copy()
+    
     st.divider()
     st.subheader("🛡️ Blocked and Escalated Cases")
 
