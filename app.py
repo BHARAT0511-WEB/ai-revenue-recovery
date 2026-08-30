@@ -998,11 +998,11 @@ def show_payment_analyzer(data, pipeline):
             last_attempt_hours_ago=last_attempt_hours_ago,
             amount=amount
         )
-
-action = decision["action"]
-reason = decision["reason"]
-policy_status = decision["policy_status"]
-next_step = decision["next_step"]
+ 
+        action = decision["action"]
+        reason = decision["reason"]
+        policy_status = decision["policy_status"]
+        next_step = decision["next_step"]
 
         st.divider()
 
