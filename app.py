@@ -602,7 +602,7 @@ def show_landing(metrics):
             "Run safe AI recovery actions, simulate outcomes, and track recovered revenue.",
             "Open Recovery Agent",
             "Recovery Agent"
-        )
+        ),
         (
             "📜 Audit Logs",
             "Review every AI decision, policy check, recovery action, and outcome.",
